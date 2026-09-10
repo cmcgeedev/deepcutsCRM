@@ -27,6 +27,13 @@
 - Terraform / AWS deployment is **not** part of this plan. It is a follow-on plan gated on a cost rundown.
 - QuickBooks Online live API pull is **not** part of this plan (needs an Intuit developer app and Chris's credentials). Imports are CSV; the `qbo_customer_id` and `qbo_item_id` columns are populated from CSV columns when present.
 
+## Execution Notes
+
+- Large verbatim files in this plan (`api/openapi.yaml`, `internal/db/migrations/00001_init.sql`, `web/src/styles.css`, the seed data) exceed the 80-line edit rule. Extract them from this plan with a script rather than retyping: `python3 scripts/extract_block.py docs/superpowers/plans/2026-09-10-phase1-core-delivery.md '<path shown in backticks before the fence>' > <path>` (Task 1 creates `scripts/extract_block.py`: it finds the first fenced block that follows a line containing the given path in backticks and prints its body).
+- Task 15's `npm create vite` may prompt in a non-TTY shell. If it hangs, kill it and write `package.json`, `tsconfig.json`, `tsconfig.app.json`, `tsconfig.node.json` and `eslint.config.js` by hand from a known Vite react-ts template; the plan supplies `vite.config.ts` and `index.html`.
+- Two deliberate deviations from the spec go into the spec in the final docs round: quantities are hundredths for every unit, and migrations live in `internal/db/migrations`.
+- Review depth: opus task review for Tasks 2, 8, 9 and 10. No task review for 13, 15 and docs steps. Everything else: one sonnet review, one scoped re-review at most.
+
 ## File Map
 
 Backend (Go):
@@ -281,7 +288,22 @@ var (
 
 Later tasks replace each `notImplemented` var with a real function defined in its own file (`cmd_serve.go` etc.) by deleting the corresponding line from this `var` block and defining `func runServe(cfg config.Config, args []string) error` there.
 
-- [ ] **Step 7: Makefile, gitignore, README**
+- [ ] **Step 7: Makefile, gitignore, README, extract script**
+
+`scripts/extract_block.py`:
+```python
+#!/usr/bin/env python3
+"""Print the first fenced code block that follows a line mentioning `<needle>` in backticks."""
+import sys
+
+plan, needle = sys.argv[1], sys.argv[2]
+lines = open(plan, encoding="utf-8").read().split("\n")
+i = next(k for k, l in enumerate(lines) if f"`{needle}`" in l)
+start = next(k for k in range(i, len(lines)) if lines[k].startswith("```")) + 1
+end = next(k for k in range(start, len(lines)) if lines[k].startswith("```"))
+print("\n".join(lines[start:end]))
+```
+
 
 `Makefile`:
 ```make
@@ -301,7 +323,7 @@ check-generated: generate
 	git diff --exit-code -- internal/db/queries internal/api web/src/api/schema.d.ts
 
 build-web:
-	cd web && npm ci --no-audit --no-fund && npm run build
+	cd web && ([ -d node_modules ] || npm ci --no-audit --no-fund) && npm run build
 
 build: build-web
 	go build -o $(BIN) ./cmd/deepcuts
@@ -2031,7 +2053,7 @@ SELECT * FROM orders WHERE id = ?;
 
 -- name: ListOrders :many
 SELECT o.*, c.name AS customer_name,
-  (SELECT count(*) FROM order_lines ol WHERE ol.order_id = o.id) AS line_count
+  CAST((SELECT count(*) FROM order_lines ol WHERE ol.order_id = o.id) AS INTEGER) AS line_count
 FROM orders o JOIN customers c ON c.id = o.customer_id
 WHERE (sqlc.arg(date) = '' OR o.requested_delivery_date = sqlc.arg(date))
   AND (sqlc.arg(status) = '' OR o.status = sqlc.arg(status))
@@ -2041,7 +2063,7 @@ LIMIT 500;
 
 -- name: ListUnscheduledOrdersForDate :many
 SELECT o.*, c.name AS customer_name,
-  (SELECT count(*) FROM order_lines ol WHERE ol.order_id = o.id) AS line_count
+  CAST((SELECT count(*) FROM order_lines ol WHERE ol.order_id = o.id) AS INTEGER) AS line_count
 FROM orders o JOIN customers c ON c.id = o.customer_id
 WHERE o.requested_delivery_date = ? AND o.status = 'confirmed'
 ORDER BY c.name;
@@ -2725,7 +2747,7 @@ SELECT * FROM delivery_stops WHERE id = ?;
 -- name: ListStopsForRoute :many
 SELECT s.*, o.customer_id, o.status AS order_status, o.needs_review, o.requested_delivery_date, o.notes AS order_notes,
   c.name AS customer_name, c.delivery_address, c.phone, c.contact_name, c.delivery_notes,
-  (SELECT count(*) FROM order_lines ol WHERE ol.order_id = o.id) AS line_count
+  CAST((SELECT count(*) FROM order_lines ol WHERE ol.order_id = o.id) AS INTEGER) AS line_count
 FROM delivery_stops s
 JOIN orders o ON o.id = s.order_id
 JOIN customers c ON c.id = o.customer_id
@@ -2735,7 +2757,7 @@ WHERE s.route_id = ? ORDER BY s.sequence, s.id;
 UPDATE delivery_stops SET sequence = ? WHERE id = ? AND route_id = ?;
 
 -- name: MaxStopSequence :one
-SELECT coalesce(max(sequence), 0) FROM delivery_stops WHERE route_id = ?;
+SELECT CAST(coalesce(max(sequence), 0) AS INTEGER) FROM delivery_stops WHERE route_id = ?;
 
 -- name: CountPendingStops :one
 SELECT count(*) FROM delivery_stops WHERE route_id = ? AND status = 'pending';
@@ -2759,7 +2781,8 @@ INSERT INTO driver_actions (client_id, stop_id, action_type, payload, received_a
 SELECT * FROM driver_actions WHERE client_id = ?;
 ```
 
-Run: `export PATH=/opt/homebrew/bin:$PATH && cd ~/deepcutsCRM && go tool sqlc generate && go build ./...`
+Run: `export PATH=/opt/homebrew/bin:$PATH && cd ~/deepcutsCRM && go tool sqlc generate && go build ./... && grep -n "func (q \*Queries) MaxStopSequence" internal/db/queries/routes.sql.go`
+Expected: the function returns `(int64, error)`. If sqlc emitted `interface{}`, the CAST was lost; fix the query before writing routes.go.
 
 - [ ] **Step 2: Write the failing tests**
 
@@ -3422,6 +3445,23 @@ func TestAdjustSetsNeedsReview(t *testing.T) {
 	}
 }
 
+func TestAdjustAfterDeliverFlagsReview(t *testing.T) {
+	f, drv, _, stopID := outRoute(t)
+	f.s.Proofs = &memProofs{}
+	_, st, err := f.s.ApplyDriverAction(ctx, drv, stopID, domain.DriverAction{ClientID: cid1, Type: domain.ActionDeliver, Proof: &domain.Proof{Type: domain.ProofName, Name: "Pat"}})
+	mustNoErr(t, err)
+	if st.Order.Order.NeedsReview {
+		t.Fatal("clean delivery must not need review")
+	}
+	lineID := st.Order.Lines[0].Line.ID
+	w := domain.Hundredths(4000)
+	_, st, err = f.s.ApplyDriverAction(ctx, drv, stopID, domain.DriverAction{ClientID: cid2, Type: domain.ActionAdjust, Lines: []domain.LineAdjustment{{LineID: lineID, DeliveredWeight: &w}}})
+	mustNoErr(t, err)
+	if st.Order.Lines[0].Line.DeliveredWeight.Int64 != 4000 || !st.Order.Order.NeedsReview {
+		t.Fatalf("adjust after deliver must flag review: %+v", st.Order.Order)
+	}
+}
+
 func (f fixture) orderOf(t *testing.T, stopID int64) int64 {
 	t.Helper()
 	st, err := f.s.Q.GetStop(ctx, stopID)
@@ -3600,6 +3640,12 @@ func (s *Service) ApplyDriverAction(ctx context.Context, driverUserID, stopID in
 			}
 			if a.Note != "" {
 				if err := q.UpdateStopNote(ctx, queries.UpdateStopNoteParams{DriverNote: a.Note, ID: stopID}); err != nil {
+					return err
+				}
+			}
+			// an adjustment after delivery changes what will be billed: the office must look at it
+			if st.Status == string(domain.StopDelivered) {
+				if err := q.SetOrderNeedsReview(ctx, queries.SetOrderNeedsReviewParams{NeedsReview: true, UpdatedAt: s.now(), ID: o.ID}); err != nil {
 					return err
 				}
 			}
@@ -4114,6 +4160,7 @@ func (a *Auth) LoginOffice(ctx context.Context, email, password, ip string) (Ses
 		return Session{}, ErrBadCredentials
 	}
 	a.Limiter.Reset("email:" + email)
+	a.Limiter.Reset("ip:" + ip) // successes from a shared warehouse IP must not lock the next driver out
 	return a.createSession(ctx, u)
 }
 
@@ -4130,6 +4177,7 @@ func (a *Auth) LoginDriver(ctx context.Context, userID int64, pin, ip string) (S
 		return Session{}, ErrBadCredentials
 	}
 	a.Limiter.Reset(userKey)
+	a.Limiter.Reset("ip:" + ip)
 	return a.createSession(ctx, u)
 }
 
@@ -8006,7 +8054,7 @@ function jsonResponse(body: unknown, status = 200) {
 describe("Customers", () => {
   afterEach(() => vi.restoreAllMocks());
   it("lists customers from the API", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse([
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => jsonResponse([
       { id: 1, name: "Blue Plate", billingAddress: "", deliveryAddress: "1 Main St", contactName: "", phone: "", email: "", deliveryNotes: "", deliveryDays: ["mon"], active: true },
     ]));
     render(<MemoryRouter><Customers /></MemoryRouter>);
@@ -9708,19 +9756,18 @@ SERVER=$!
 trap 'kill $SERVER 2>/dev/null; rm -rf "$T"' EXIT
 for i in $(seq 1 50); do curl -s -o /dev/null "$API/driver/drivers" && break; sleep 0.1; done
 
-# call METHOD PATH [JSON] [JAR] -> prints body; sets $STATUS
+# call METHOD PATH [JSON] [JAR] -> prints the body; the HTTP status goes to $T/status so it
+# survives the $(...) subshell that callers use.
 call() {
   local m=$1 p=$2 body=${3:-} jar=${4:-$JAR}
-  local out
   if [ -n "$body" ]; then
-    out=$(curl -s -w '\n%{http_code}' -b "$jar" -c "$jar" -X "$m" "$API$p" -H 'Content-Type: application/json' -d "$body")
+    curl -s -o "$T/body" -w '%{http_code}' -b "$jar" -c "$jar" -X "$m" "$API$p" -H 'Content-Type: application/json' -d "$body" > "$T/status"
   else
-    out=$(curl -s -w '\n%{http_code}' -b "$jar" -c "$jar" -X "$m" "$API$p")
+    curl -s -o "$T/body" -w '%{http_code}' -b "$jar" -c "$jar" -X "$m" "$API$p" > "$T/status"
   fi
-  STATUS=$(echo "$out" | tail -n1)
-  echo "$out" | sed '$d'
+  cat "$T/body"
 }
-expect() { if [ "$STATUS" != "$1" ]; then echo "FAIL: $2 → HTTP $STATUS: $3" >&2; exit 1; fi; echo "ok: $2"; }
+expect() { local st; st=$(cat "$T/status"); if [ "$st" != "$1" ]; then echo "FAIL: $2 → HTTP $st: $3" >&2; exit 1; fi; echo "ok: $2"; }
 jq_() { python3 -c "import sys,json; d=json.load(sys.stdin); print($1)"; }
 
 B=$(call POST /office/login '{"email":"office@demo.local","password":"demo1234"}'); expect 200 "office login" "$B"
