@@ -1,0 +1,14 @@
+# local data: sqlite files, uploads, demo databases
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# secrets
+.env
+*.tfvars
+
+# build outputs
+bin/
+web/dist/
+web/node_modules/
