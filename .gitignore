@@ -12,3 +12,6 @@ data/
 bin/
 web/dist/
 web/node_modules/
+
+# SDD scratch
+.superpowers/
