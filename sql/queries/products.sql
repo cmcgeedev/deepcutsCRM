@@ -15,4 +15,4 @@ SELECT * FROM products WHERE id = ?;
 SELECT * FROM products WHERE sku = ?;
 
 -- name: ListProducts :many
-SELECT * FROM products WHERE (sqlc.arg(include_inactive) = TRUE OR active = TRUE) ORDER BY category, name;
+SELECT * FROM products WHERE (CAST(sqlc.arg(include_inactive) AS BOOLEAN) = TRUE OR active = TRUE) ORDER BY category, name;

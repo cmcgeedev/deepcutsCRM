@@ -21,6 +21,10 @@ func TestOpenAndMigrate(t *testing.T) {
 	if err := d.QueryRow("PRAGMA foreign_keys").Scan(&fk); err != nil || fk != 1 {
 		t.Fatalf("foreign_keys=%d err=%v", fk, err)
 	}
+	var busyTimeout int
+	if err := d.QueryRow("PRAGMA busy_timeout").Scan(&busyTimeout); err != nil || busyTimeout != 5000 {
+		t.Fatalf("busy_timeout=%d err=%v", busyTimeout, err)
+	}
 	var n int
 	if err := d.QueryRow("SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN ('customers','users','sessions','products','customer_prices','orders','order_lines','delivery_routes','delivery_stops','driver_actions')").Scan(&n); err != nil || n != 10 {
 		t.Fatalf("tables=%d err=%v", n, err)

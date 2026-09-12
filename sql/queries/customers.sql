@@ -18,4 +18,4 @@ SELECT * FROM customers WHERE qbo_customer_id = ?;
 SELECT * FROM customers WHERE name = ?;
 
 -- name: ListCustomers :many
-SELECT * FROM customers WHERE (sqlc.arg(include_inactive) = TRUE OR active = TRUE) ORDER BY name;
+SELECT * FROM customers WHERE (CAST(sqlc.arg(include_inactive) AS BOOLEAN) = TRUE OR active = TRUE) ORDER BY name;

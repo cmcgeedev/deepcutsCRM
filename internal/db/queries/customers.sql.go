@@ -140,10 +140,10 @@ func (q *Queries) GetCustomerByQBO(ctx context.Context, qboCustomerID sql.NullSt
 }
 
 const listCustomers = `-- name: ListCustomers :many
-SELECT id, name, billing_address, delivery_address, contact_name, phone, email, delivery_notes, delivery_days, qbo_customer_id, active, created_at, updated_at FROM customers WHERE (?1 = TRUE OR active = TRUE) ORDER BY name
+SELECT id, name, billing_address, delivery_address, contact_name, phone, email, delivery_notes, delivery_days, qbo_customer_id, active, created_at, updated_at FROM customers WHERE (CAST(?1 AS BOOLEAN) = TRUE OR active = TRUE) ORDER BY name
 `
 
-func (q *Queries) ListCustomers(ctx context.Context, includeInactive interface{}) ([]Customer, error) {
+func (q *Queries) ListCustomers(ctx context.Context, includeInactive bool) ([]Customer, error) {
 	rows, err := q.db.QueryContext(ctx, listCustomers, includeInactive)
 	if err != nil {
 		return nil, err

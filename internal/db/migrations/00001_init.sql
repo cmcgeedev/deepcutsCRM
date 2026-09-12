@@ -44,7 +44,7 @@ CREATE TABLE products (
   category TEXT NOT NULL DEFAULT '',
   sell_unit TEXT NOT NULL CHECK (sell_unit IN ('lb','case','each')),
   catch_weight BOOLEAN NOT NULL DEFAULT FALSE,
-  approx_case_weight INTEGER,
+  approx_case_weight INTEGER, -- hundredths of lb
   base_price_cents INTEGER NOT NULL,
   qbo_item_id TEXT,
   active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -80,13 +80,13 @@ CREATE TABLE order_lines (
   id INTEGER PRIMARY KEY,
   order_id INTEGER NOT NULL REFERENCES orders(id),
   product_id INTEGER NOT NULL REFERENCES products(id),
-  ordered_qty INTEGER NOT NULL,
+  ordered_qty INTEGER NOT NULL, -- hundredths of the sell unit
   unit_price_cents INTEGER NOT NULL,
   price_overridden BOOLEAN NOT NULL DEFAULT FALSE,
-  est_weight INTEGER,
-  shipped_weight INTEGER,
-  delivered_qty INTEGER,
-  delivered_weight INTEGER,
+  est_weight INTEGER, -- hundredths of lb
+  shipped_weight INTEGER, -- hundredths of lb
+  delivered_qty INTEGER, -- hundredths of the sell unit
+  delivered_weight INTEGER, -- hundredths of lb
   shortage_note TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX order_lines_order ON order_lines(order_id);

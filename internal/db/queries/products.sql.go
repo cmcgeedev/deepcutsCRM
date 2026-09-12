@@ -110,10 +110,10 @@ func (q *Queries) GetProductBySKU(ctx context.Context, sku string) (Product, err
 }
 
 const listProducts = `-- name: ListProducts :many
-SELECT id, sku, name, category, sell_unit, catch_weight, approx_case_weight, base_price_cents, qbo_item_id, active, created_at, updated_at FROM products WHERE (?1 = TRUE OR active = TRUE) ORDER BY category, name
+SELECT id, sku, name, category, sell_unit, catch_weight, approx_case_weight, base_price_cents, qbo_item_id, active, created_at, updated_at FROM products WHERE (CAST(?1 AS BOOLEAN) = TRUE OR active = TRUE) ORDER BY category, name
 `
 
-func (q *Queries) ListProducts(ctx context.Context, includeInactive interface{}) ([]Product, error) {
+func (q *Queries) ListProducts(ctx context.Context, includeInactive bool) ([]Product, error) {
 	rows, err := q.db.QueryContext(ctx, listProducts, includeInactive)
 	if err != nil {
 		return nil, err
