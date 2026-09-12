@@ -9,6 +9,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -67,6 +68,8 @@ func newTestEnv(t *testing.T) *testEnv {
 	}
 	return env
 }
+
+func itoa(i int64) string { return strconv.FormatInt(i, 10) }
 
 func jarClient() *http.Client {
 	jar, _ := cookiejar.New(nil)
