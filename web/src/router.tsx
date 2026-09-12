@@ -2,6 +2,10 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { RequireSession, SessionProvider } from "./auth/Session";
 import OfficeLayout from "./routes/office/Layout";
 import OfficeLogin from "./routes/office/Login";
+import Customers from "./routes/office/Customers";
+import CustomerDetail from "./routes/office/CustomerDetail";
+import Products from "./routes/office/Products";
+import ProductDetail from "./routes/office/ProductDetail";
 import DriverLayout from "./routes/driver/Layout";
 
 const Todo = ({ name }: { name: string }) => <h1>{name}</h1>;
@@ -16,10 +20,10 @@ function Office() {
           <Route path="day" element={<Todo name="Day" />} />
           <Route path="orders" element={<Todo name="Orders" />} />
           <Route path="orders/:id" element={<Todo name="Order" />} />
-          <Route path="customers" element={<Todo name="Customers" />} />
-          <Route path="customers/:id" element={<Todo name="Customer" />} />
-          <Route path="products" element={<Todo name="Products" />} />
-          <Route path="products/:id" element={<Todo name="Product" />} />
+          <Route path="customers" element={<Customers />} />
+          <Route path="customers/:id" element={<CustomerDetail />} />
+          <Route path="products" element={<Products />} />
+          <Route path="products/:id" element={<ProductDetail />} />
           <Route path="*" element={<Navigate to="day" replace />} />
         </Route>
       </Routes>
