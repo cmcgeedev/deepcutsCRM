@@ -289,17 +289,17 @@ const listOrders = `-- name: ListOrders :many
 SELECT o.id, o.customer_id, o.requested_delivery_date, o.status, o.notes, o.created_by, o.needs_review, o.created_at, o.updated_at, o.finalized_at, c.name AS customer_name,
   CAST((SELECT count(*) FROM order_lines ol WHERE ol.order_id = o.id) AS INTEGER) AS line_count
 FROM orders o JOIN customers c ON c.id = o.customer_id
-WHERE (?1 = '' OR o.requested_delivery_date = ?1)
-  AND (?2 = '' OR o.status = ?2)
-  AND (?3 = 0 OR o.customer_id = ?3)
+WHERE (CAST(?1 AS TEXT) = '' OR o.requested_delivery_date = ?1)
+  AND (CAST(?2 AS TEXT) = '' OR o.status = ?2)
+  AND (CAST(?3 AS INTEGER) = 0 OR o.customer_id = ?3)
 ORDER BY o.requested_delivery_date DESC, o.id DESC
 LIMIT 500
 `
 
 type ListOrdersParams struct {
-	Date       interface{}
-	Status     interface{}
-	CustomerID interface{}
+	Date       string
+	Status     string
+	CustomerID int64
 }
 
 type ListOrdersRow struct {

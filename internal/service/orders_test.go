@@ -111,6 +111,9 @@ func TestOrderTransitionsAndLocks(t *testing.T) {
 	wantCode(t, err, "locked")
 	_, err = f.s.ConfirmOrder(ctx, o.Order.ID)
 	wantCode(t, err, "invalid_transition")
+	// cancelling an already-cancelled order is an invalid transition, not "locked"
+	_, err = f.s.CancelOrder(ctx, o.Order.ID)
+	wantCode(t, err, "invalid_transition")
 }
 
 func TestListOrdersFilters(t *testing.T) {

@@ -90,7 +90,11 @@ func (s *Service) UpdateOrder(ctx context.Context, id int64, notes, date *string
 		if err != nil {
 			return notFoundIf(err, "order")
 		}
-		if scope, _ := s.editScope(ctx, q, o); scope != domain.EditAll {
+		scope, _, err := s.editScope(ctx, q, o)
+		if err != nil {
+			return err
+		}
+		if scope != domain.EditAll {
 			return Conflict("locked", "order can no longer be edited")
 		}
 		if notes != nil {
@@ -115,12 +119,17 @@ func (s *Service) UpdateOrder(ctx context.Context, id int64, notes, date *string
 }
 
 // editScope returns what may be edited on the order's lines, and the active route status if any.
-func (s *Service) editScope(ctx context.Context, q *queries.Queries, o queries.Order) (domain.LineEditScope, string) {
+// sql.ErrNoRows from GetActiveStopForOrder means no active stop; any other error is returned.
+func (s *Service) editScope(ctx context.Context, q *queries.Queries, o queries.Order) (domain.LineEditScope, string, error) {
 	routeStatus := ""
-	if stop, err := q.GetActiveStopForOrder(ctx, o.ID); err == nil {
+	stop, err := q.GetActiveStopForOrder(ctx, o.ID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return 0, "", err
+	}
+	if err == nil {
 		routeStatus = stop.RouteStatus
 	}
-	return domain.LineEditScopeFor(domain.OrderStatus(o.Status), domain.RouteStatus(routeStatus)), routeStatus
+	return domain.LineEditScopeFor(domain.OrderStatus(o.Status), domain.RouteStatus(routeStatus)), routeStatus, nil
 }
 
 func (s *Service) AddLine(ctx context.Context, orderID, productID, orderedQty int64) (OrderDetail, error) {
@@ -133,7 +142,11 @@ func (s *Service) AddLine(ctx context.Context, orderID, productID, orderedQty in
 		if err != nil {
 			return notFoundIf(err, "order")
 		}
-		if scope, _ := s.editScope(ctx, q, o); scope != domain.EditAll {
+		scope, _, err := s.editScope(ctx, q, o)
+		if err != nil {
+			return err
+		}
+		if scope != domain.EditAll {
 			return Conflict("locked", "lines cannot be added to this order")
 		}
 		p, err := q.GetProduct(ctx, productID)
@@ -178,7 +191,10 @@ func (s *Service) UpdateLine(ctx context.Context, orderID, lineID int64, patch L
 		if err != nil {
 			return err
 		}
-		scope, _ := s.editScope(ctx, q, o)
+		scope, _, err := s.editScope(ctx, q, o)
+		if err != nil {
+			return err
+		}
 		if err := applyLinePatch(&l, productOf(p), patch, scope); err != nil {
 			return err
 		}
@@ -268,7 +284,11 @@ func (s *Service) DeleteLine(ctx context.Context, orderID, lineID int64) (OrderD
 		if err != nil {
 			return notFoundIf(err, "order")
 		}
-		if scope, _ := s.editScope(ctx, q, o); scope != domain.EditAll {
+		scope, _, err := s.editScope(ctx, q, o)
+		if err != nil {
+			return err
+		}
+		if scope != domain.EditAll {
 			return Conflict("locked", "lines cannot be removed from this order")
 		}
 		if _, err := q.GetOrderLine(ctx, queries.GetOrderLineParams{ID: lineID, OrderID: orderID}); err != nil {
@@ -337,6 +357,9 @@ func (s *Service) UnconfirmOrder(ctx context.Context, id int64) (OrderDetail, er
 // only while the route is planned; once the route is out the office must skip it via the driver flow.
 func (s *Service) CancelOrder(ctx context.Context, id int64) (OrderDetail, error) {
 	return s.simpleTransition(ctx, id, domain.OrderCancelled, func(q *queries.Queries, o queries.Order) error {
+		if !domain.OrderStatus(o.Status).CanTransition(domain.OrderCancelled) {
+			return Conflict("invalid_transition", fmt.Sprintf("order cannot go from %s to cancelled", o.Status))
+		}
 		stop, err := q.GetActiveStopForOrder(ctx, o.ID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil
@@ -416,7 +439,11 @@ func (s *Service) loadOrder(ctx context.Context, q *queries.Queries, id int64) (
 		d.Lines = append(d.Lines, LineDetail{Line: line, Product: p, AmountCents: amt, AmountSource: src})
 		d.TotalCents += amt
 	}
-	if stop, err := q.GetActiveStopForOrder(ctx, id); err == nil {
+	stop, err := q.GetActiveStopForOrder(ctx, id)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return OrderDetail{}, err
+	}
+	if err == nil {
 		d.RouteID, d.StopID, d.RouteStatus = &stop.RouteID, &stop.StopID, stop.RouteStatus
 	}
 	return d, nil

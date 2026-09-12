@@ -9,9 +9,9 @@ SELECT * FROM orders WHERE id = ?;
 SELECT o.*, c.name AS customer_name,
   CAST((SELECT count(*) FROM order_lines ol WHERE ol.order_id = o.id) AS INTEGER) AS line_count
 FROM orders o JOIN customers c ON c.id = o.customer_id
-WHERE (sqlc.arg(date) = '' OR o.requested_delivery_date = sqlc.arg(date))
-  AND (sqlc.arg(status) = '' OR o.status = sqlc.arg(status))
-  AND (sqlc.arg(customer_id) = 0 OR o.customer_id = sqlc.arg(customer_id))
+WHERE (CAST(sqlc.arg(date) AS TEXT) = '' OR o.requested_delivery_date = sqlc.arg(date))
+  AND (CAST(sqlc.arg(status) AS TEXT) = '' OR o.status = sqlc.arg(status))
+  AND (CAST(sqlc.arg(customer_id) AS INTEGER) = 0 OR o.customer_id = sqlc.arg(customer_id))
 ORDER BY o.requested_delivery_date DESC, o.id DESC
 LIMIT 500;
 
