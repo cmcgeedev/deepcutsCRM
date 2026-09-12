@@ -4,6 +4,7 @@ import { api, errorOf, type ApiError, type Schemas } from "../../api/client";
 import { ErrorBanner, Field } from "../../components/Field";
 import { StatusBadge } from "../../components/StatusBadge";
 import { useApi } from "../../components/useApi";
+import { shiftDate } from "../../lib/format";
 
 type Route = Schemas["Route"];
 
@@ -23,15 +24,16 @@ export default function Day() {
 
   const run = async (p: Promise<{ error?: unknown; response: Response }>) => {
     const res = await p;
-    setErr(errorOf(res));
+    const e = errorOf(res);
+    setErr(e);
     day.reload();
+    return e;
   };
   const rp = (routeId: number) => ({ params: { path: { routeId } } });
 
   async function newRoute(e: FormEvent) {
     e.preventDefault();
-    await run(api.POST("/api/office/routes", { body: { routeDate: date, driverUserId: driverId, truckLabel: truck } }));
-    setTruck("");
+    if (!(await run(api.POST("/api/office/routes", { body: { routeDate: date, driverUserId: driverId, truckLabel: truck } })))) setTruck("");
   }
 
   function move(r: Route, idx: number, dir: -1 | 1) {
@@ -47,8 +49,8 @@ export default function Day() {
       <div className="row">
         <h1>Day</h1>
         <input type="date" value={date} onChange={(e) => setParams({ date: e.target.value })} />
-        <button className="secondary" onClick={() => setParams({ date: shift(date, -1) })}>‹ prev</button>
-        <button className="secondary" onClick={() => setParams({ date: shift(date, 1) })}>next ›</button>
+        <button className="secondary" onClick={() => setParams({ date: shiftDate(date, -1) })}>‹ prev</button>
+        <button className="secondary" onClick={() => setParams({ date: shiftDate(date, 1) })}>next ›</button>
       </div>
       <ErrorBanner error={err} />
       <ErrorBanner error={day.error} />
@@ -63,7 +65,7 @@ export default function Day() {
                 {o.needsReview && <> <span className="badge warn">skipped earlier</span></>}
               </div>
               {day.data && day.data.routes.filter((r) => r.status === "planned").length > 0 && (
-                <select defaultValue="" onChange={(e) => e.target.value && run(api.POST("/api/office/routes/{routeId}/stops", { ...rp(Number(e.target.value)), body: { orderId: o.id } }))}>
+                <select value="" onChange={(e) => e.target.value && run(api.POST("/api/office/routes/{routeId}/stops", { ...rp(Number(e.target.value)), body: { orderId: o.id } }))}>
                   <option value="">add to route…</option>
                   {day.data.routes.filter((r) => r.status === "planned").map((r) => <option key={r.id} value={r.id}>#{r.id} {r.driverName} {r.truckLabel}</option>)}
                 </select>
@@ -125,10 +127,4 @@ export default function Day() {
       </div>
     </>
   );
-}
-
-function shift(date: string, days: number): string {
-  const d = new Date(date + "T12:00:00");
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
 }

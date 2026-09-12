@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hundredths, lb, money, qty, toCents, toHundredths } from "./format";
+import { hundredths, lb, money, qty, shiftDate, toCents, toHundredths } from "./format";
 
 describe("format", () => {
   it("money", () => {
@@ -26,5 +26,10 @@ describe("format", () => {
     expect(toHundredths("-1")).toBeNull();
     expect(toCents("5.99")).toBe(599);
     expect(toCents("$5.99")).toBe(599);
+  });
+  it("shiftDate crosses month, year, and leap-year boundaries independent of local timezone", () => {
+    expect(shiftDate("2026-03-08", 1)).toBe("2026-03-09");
+    expect(shiftDate("2026-12-31", 1)).toBe("2027-01-01");
+    expect(shiftDate("2026-03-01", -1)).toBe("2026-02-28");
   });
 });

@@ -27,3 +27,12 @@ function parseDecimal(s: string): number | null {
 
 export const toHundredths = parseDecimal;
 export const toCents = parseDecimal;
+
+/** Shifts a "YYYY-MM-DD" date string by `days` using pure calendar arithmetic (UTC-anchored, no local timezone drift). */
+export function shiftDate(date: string, days: number): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d) + days * 86400000);
+  const mm = String(t.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(t.getUTCDate()).padStart(2, "0");
+  return `${t.getUTCFullYear()}-${mm}-${dd}`;
+}
