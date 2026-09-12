@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router";
 import { api, errorOf, type ApiError, type Schemas } from "../../api/client";
 import { ErrorBanner, Field } from "../../components/Field";
@@ -51,6 +51,19 @@ export default function CustomerDetail() {
   const [effectiveFrom, setEffectiveFrom] = useState(new Date().toISOString().slice(0, 10));
   const [perr, setPerr] = useState<ApiError | null>(null);
 
+  // Keyed on cust.data (not recomputed on every render) so CustomerForm's
+  // useEffect only resets in-progress edits when the loaded customer
+  // actually changes -- not when unrelated CustomerDetail state (e.g. the
+  // negotiated-price form fields) changes and re-renders this component.
+  const c = cust.data;
+  const initial = useMemo<Input | null>(
+    () =>
+      c
+        ? { name: c.name, billingAddress: c.billingAddress, deliveryAddress: c.deliveryAddress, contactName: c.contactName, phone: c.phone, email: c.email, deliveryNotes: c.deliveryNotes, deliveryDays: c.deliveryDays, qboCustomerId: c.qboCustomerId ?? "", active: c.active }
+        : null,
+    [c],
+  );
+
   async function save(v: Input) {
     setBusy(true); setSaved(false);
     const res = await api.PUT("/api/office/customers/{customerId}", { params: { path: { customerId: id } }, body: v });
@@ -69,9 +82,7 @@ export default function CustomerDetail() {
   }
 
   if (cust.error) return <ErrorBanner error={cust.error} />;
-  if (!cust.data) return <p className="muted">Loading…</p>;
-  const c = cust.data;
-  const initial: Input = { name: c.name, billingAddress: c.billingAddress, deliveryAddress: c.deliveryAddress, contactName: c.contactName, phone: c.phone, email: c.email, deliveryNotes: c.deliveryNotes, deliveryDays: c.deliveryDays, qboCustomerId: c.qboCustomerId ?? "", active: c.active };
+  if (!c || !initial) return <p className="muted">Loading…</p>;
   return (
     <>
       <p><Link to="/office/customers">← Customers</Link></p>
