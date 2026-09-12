@@ -1,7 +1,7 @@
 export PATH := /opt/homebrew/bin:$(PATH)
 BIN := bin/deepcuts
 
-.PHONY: all generate build build-web test test-go test-web demo demo-tls clean e2e check-generated
+.PHONY: all generate build build-web build-linux test test-go test-web demo demo-tls clean e2e check-generated
 
 all: build
 
@@ -42,4 +42,4 @@ e2e: build
 	./scripts/e2e.sh
 
 clean:
-	rm -rf bin web/dist
+	rm -rf bin web/dist/*
