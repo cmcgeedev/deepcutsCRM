@@ -14,7 +14,7 @@ check-generated: generate
 	git diff --exit-code -- internal/db/queries internal/api web/src/api/schema.d.ts
 
 build-web:
-	cd web && ([ -d node_modules ] || npm ci --no-audit --no-fund) && npm run build
+	cd web && ([ -d node_modules ] || npm ci --no-audit --no-fund) && npm run build && touch dist/.gitkeep
 
 build: build-web
 	go build -o $(BIN) ./cmd/deepcuts
