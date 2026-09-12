@@ -64,3 +64,6 @@ WHERE s.order_id = ? AND s.status <> 'skipped';
 
 -- name: DeleteStop :exec
 DELETE FROM delivery_stops WHERE id = ?;
+
+-- name: ResetDeliveredForOrder :exec
+UPDATE order_lines SET delivered_qty = NULL, delivered_weight = NULL, shortage_note = '' WHERE order_id = ?;

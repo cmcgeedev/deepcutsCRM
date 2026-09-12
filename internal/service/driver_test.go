@@ -77,6 +77,11 @@ func TestDeliverWithImageProofSaves(t *testing.T) {
 	if m.saved != 1 || st.Stop.ProofRef.String != "proofs/x.png" {
 		t.Fatalf("proof not saved: %+v", st.Stop)
 	}
+	applied, _, err := f.s.ApplyDriverAction(ctx, drv, stopID, a)
+	mustNoErr(t, err)
+	if applied || m.saved != 1 {
+		t.Fatalf("replay must not re-save the proof: applied=%v saved=%d", applied, m.saved)
+	}
 }
 
 func TestAdjustSetsNeedsReview(t *testing.T) {
@@ -158,4 +163,85 @@ func TestAdjustRejectsForeignLine(t *testing.T) {
 	w := domain.Hundredths(1)
 	_, _, err := f.s.ApplyDriverAction(ctx, drv, stopID, domain.DriverAction{ClientID: cid1, Type: domain.ActionAdjust, Lines: []domain.LineAdjustment{{LineID: 999, DeliveredWeight: &w}}})
 	wantCode(t, err, "invalid")
+}
+
+func TestActionOnPlannedRouteRejected(t *testing.T) {
+	f := newFixture(t)
+	drv := f.driver(t, "Sam")
+	o := f.confirmedOrder(t, "2026-09-10")
+	r, err := f.s.CreateRoute(ctx, RouteInput{RouteDate: "2026-09-10", DriverUserID: drv})
+	mustNoErr(t, err)
+	r, err = f.s.AddStop(ctx, r.Route.ID, o)
+	mustNoErr(t, err)
+	_, _, err = f.s.ApplyDriverAction(ctx, drv, r.Stops[0].Stop.ID, domain.DriverAction{ClientID: cid1, Type: domain.ActionSkip, SkipReason: "x"})
+	wantCode(t, err, "route_not_out")
+}
+
+func TestClientIDReusedOnDifferentStopRejected(t *testing.T) {
+	f := newFixture(t)
+	drv := f.driver(t, "Sam")
+	o1 := f.confirmedOrder(t, "2026-09-10")
+	o2 := f.confirmedOrder(t, "2026-09-10")
+	r, err := f.s.CreateRoute(ctx, RouteInput{RouteDate: "2026-09-10", DriverUserID: drv})
+	mustNoErr(t, err)
+	r, err = f.s.AddStop(ctx, r.Route.ID, o1)
+	mustNoErr(t, err)
+	r, err = f.s.AddStop(ctx, r.Route.ID, o2)
+	mustNoErr(t, err)
+	r, err = f.s.RouteOut(ctx, r.Route.ID)
+	mustNoErr(t, err)
+	_, _, err = f.s.ApplyDriverAction(ctx, drv, r.Stops[0].Stop.ID, domain.DriverAction{ClientID: cid1, Type: domain.ActionSkip, SkipReason: "x"})
+	mustNoErr(t, err)
+	_, _, err = f.s.ApplyDriverAction(ctx, drv, r.Stops[1].Stop.ID, domain.DriverAction{ClientID: cid1, Type: domain.ActionSkip, SkipReason: "y"})
+	wantCode(t, err, "client_id_reused")
+}
+
+func TestReplayAfterRouteCompleteIsNoop(t *testing.T) {
+	f, drv, routeID, stopID := outRoute(t)
+	f.s.Proofs = &memProofs{}
+	a := domain.DriverAction{ClientID: cid1, Type: domain.ActionDeliver, Proof: &domain.Proof{Type: domain.ProofName, Name: "Pat"}}
+	_, _, err := f.s.ApplyDriverAction(ctx, drv, stopID, a)
+	mustNoErr(t, err)
+	_, err = f.s.DriverCompleteRoute(ctx, drv, routeID)
+	mustNoErr(t, err)
+	applied, st, err := f.s.ApplyDriverAction(ctx, drv, stopID, a)
+	mustNoErr(t, err)
+	if applied {
+		t.Fatal("replay after route complete must not apply")
+	}
+	if st.Stop.Status != "delivered" {
+		t.Fatalf("replay must return current stop: %+v", st.Stop)
+	}
+}
+
+func TestSkipClearsAbortedDeliveryAttempt(t *testing.T) {
+	f, drv, _, stopID := outRoute(t)
+	lineID := mustLine(t, f, f.orderOf(t, stopID))
+	w := domain.Hundredths(3000)
+	note := "damaged"
+	_, _, err := f.s.ApplyDriverAction(ctx, drv, stopID, domain.DriverAction{ClientID: cid1, Type: domain.ActionAdjust, Lines: []domain.LineAdjustment{{LineID: lineID, DeliveredWeight: &w, ShortageNote: &note}}})
+	mustNoErr(t, err)
+	_, st, err := f.s.ApplyDriverAction(ctx, drv, stopID, domain.DriverAction{ClientID: cid2, Type: domain.ActionSkip, SkipReason: "closed"})
+	mustNoErr(t, err)
+	l := st.Order.Lines[0].Line
+	if l.DeliveredWeight.Valid || l.DeliveredQty.Valid || l.ShortageNote != "" {
+		t.Fatalf("skip must clear aborted delivery attempt: %+v", l)
+	}
+}
+
+func TestDeliverPreservesEarlierNote(t *testing.T) {
+	f, drv, _, stopID := outRoute(t)
+	f.s.Proofs = &memProofs{}
+	lineID := mustLine(t, f, f.orderOf(t, stopID))
+	qty := domain.Hundredths(100)
+	_, st, err := f.s.ApplyDriverAction(ctx, drv, stopID, domain.DriverAction{ClientID: cid1, Type: domain.ActionAdjust, Lines: []domain.LineAdjustment{{LineID: lineID, DeliveredQty: &qty}}, Note: "customer not answering"})
+	mustNoErr(t, err)
+	if st.Stop.DriverNote != "customer not answering" {
+		t.Fatalf("adjust note not set: %+v", st.Stop)
+	}
+	_, st, err = f.s.ApplyDriverAction(ctx, drv, stopID, domain.DriverAction{ClientID: cid2, Type: domain.ActionDeliver, Proof: &domain.Proof{Type: domain.ProofName, Name: "Pat"}})
+	mustNoErr(t, err)
+	if st.Stop.DriverNote != "customer not answering" {
+		t.Fatalf("deliver must preserve earlier note: %+v", st.Stop)
+	}
 }

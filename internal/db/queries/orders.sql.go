@@ -412,6 +412,15 @@ func (q *Queries) ListUnscheduledOrdersForDate(ctx context.Context, requestedDel
 	return items, nil
 }
 
+const resetDeliveredForOrder = `-- name: ResetDeliveredForOrder :exec
+UPDATE order_lines SET delivered_qty = NULL, delivered_weight = NULL, shortage_note = '' WHERE order_id = ?
+`
+
+func (q *Queries) ResetDeliveredForOrder(ctx context.Context, orderID int64) error {
+	_, err := q.db.ExecContext(ctx, resetDeliveredForOrder, orderID)
+	return err
+}
+
 const setOrderNeedsReview = `-- name: SetOrderNeedsReview :exec
 UPDATE orders SET needs_review = ?, updated_at = ? WHERE id = ?
 `

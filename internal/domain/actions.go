@@ -1,6 +1,9 @@
 package domain
 
-import "regexp"
+import (
+	"bytes"
+	"regexp"
+)
 
 type ActionType string
 
@@ -89,8 +92,16 @@ func (p Proof) validate() string {
 		if len(p.Data) > MaxProofBytes {
 			return "image larger than 300 KB"
 		}
+		if !isPNGOrJPEG(p.Data) {
+			return "image must be PNG or JPEG"
+		}
 	default:
 		return "type must be signature, photo or name"
 	}
 	return ""
+}
+
+// isPNGOrJPEG sniffs the magic bytes of a signature/photo proof image.
+func isPNGOrJPEG(data []byte) bool {
+	return bytes.HasPrefix(data, []byte{0x89, 'P', 'N', 'G'}) || bytes.HasPrefix(data, []byte{0xFF, 0xD8, 0xFF})
 }

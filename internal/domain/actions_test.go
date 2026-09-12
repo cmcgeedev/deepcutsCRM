@@ -28,6 +28,10 @@ func TestDriverActionValidate(t *testing.T) {
 	if errs := (DriverAction{ClientID: uuid1, Type: ActionDeliver, Proof: big}).Validate(); errs["proof"] == "" {
 		t.Error("oversized proof must fail")
 	}
+	notImage := &Proof{Type: ProofSignature, Data: []byte("not an image")}
+	if errs := (DriverAction{ClientID: uuid1, Type: ActionDeliver, Proof: notImage}).Validate(); errs["proof"] == "" {
+		t.Error("non-PNG/JPEG proof data must fail")
+	}
 	if errs := (DriverAction{ClientID: uuid1, Type: ActionSkip}).Validate(); errs["skipReason"] == "" {
 		t.Error("skip without reason must fail")
 	}

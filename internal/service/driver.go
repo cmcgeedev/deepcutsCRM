@@ -109,6 +109,9 @@ func (s *Service) ApplyDriverAction(ctx context.Context, driverUserID, stopID in
 		}
 		switch a.Type {
 		case domain.ActionAdjust:
+			if domain.OrderStatus(o.Status) == domain.OrderFinalized {
+				return Conflict("locked", "order is finalized")
+			}
 			if st.Status == string(domain.StopSkipped) {
 				return Conflict("invalid_transition", "stop was skipped")
 			}
@@ -137,7 +140,7 @@ func (s *Service) ApplyDriverAction(ctx context.Context, driverUserID, stopID in
 				}
 				ref, err = s.Proofs.Save("proofs", a.Proof.Data)
 				if err != nil {
-					return Invalid(map[string]string{"proof": err.Error()})
+					return fmt.Errorf("save proof: %w", err)
 				}
 			}
 			if err := s.applyAdjustments(ctx, q, o, a.Lines); err != nil {
@@ -147,7 +150,7 @@ func (s *Service) ApplyDriverAction(ctx context.Context, driverUserID, stopID in
 				return err
 			}
 			if err := q.UpdateStopDelivered(ctx, queries.UpdateStopDeliveredParams{
-				DeliveredAt: sql.NullTime{Time: s.now(), Valid: true}, ProofType: nullStr(string(a.Proof.Type)), ProofRef: nullStr(ref), DriverNote: a.Note, ID: stopID,
+				DeliveredAt: sql.NullTime{Time: s.now(), Valid: true}, ProofType: nullStr(string(a.Proof.Type)), ProofRef: nullStr(ref), DriverNote: noteOrExisting(a.Note, st.DriverNote), ID: stopID,
 			}); err != nil {
 				return err
 			}
@@ -158,7 +161,10 @@ func (s *Service) ApplyDriverAction(ctx context.Context, driverUserID, stopID in
 			if st.Status != string(domain.StopPending) {
 				return Conflict("invalid_transition", "stop is already "+st.Status)
 			}
-			if err := q.UpdateStopSkipped(ctx, queries.UpdateStopSkippedParams{SkipReason: a.SkipReason, DriverNote: a.Note, ID: stopID}); err != nil {
+			if err := q.ResetDeliveredForOrder(ctx, o.ID); err != nil {
+				return err
+			}
+			if err := q.UpdateStopSkipped(ctx, queries.UpdateStopSkippedParams{SkipReason: a.SkipReason, DriverNote: noteOrExisting(a.Note, st.DriverNote), ID: stopID}); err != nil {
 				return err
 			}
 			if err := s.transitionOrder(ctx, q, o, domain.OrderConfirmed); err != nil {
@@ -170,13 +176,36 @@ func (s *Service) ApplyDriverAction(ctx context.Context, driverUserID, stopID in
 		}
 		payload, _ := json.Marshal(map[string]any{"type": a.Type, "note": a.Note, "skipReason": a.SkipReason, "lines": len(a.Lines), "proof": proofType(a.Proof)})
 		if err := q.CreateDriverAction(ctx, queries.CreateDriverActionParams{ClientID: a.ClientID, StopID: stopID, ActionType: string(a.Type), Payload: string(payload), ReceivedAt: s.now()}); err != nil {
+			if isUniqueViolation(err) {
+				return errDriverActionReplay
+			}
 			return err
 		}
 		applied = true
 		out, err = s.loadDriverStop(ctx, q, stopID)
 		return err
 	})
+	if errors.Is(err, errDriverActionReplay) {
+		// a concurrent request already recorded this ClientID and committed; reload the current
+		// state outside the (rolled-back) transaction and report the replay as a no-op.
+		var loadErr error
+		out, loadErr = s.loadDriverStop(ctx, s.Q, stopID)
+		return false, out, loadErr
+	}
 	return applied, out, err
+}
+
+// errDriverActionReplay signals that CreateDriverAction hit a PRIMARY KEY violation because a
+// concurrent request already applied and committed this ClientID; the transaction is rolled back
+// and the caller reports applied=false with no error instead.
+var errDriverActionReplay = errors.New("driver action already applied by a concurrent request")
+
+// noteOrExisting keeps the stop's prior driver note when the incoming action carries none.
+func noteOrExisting(note, existing string) string {
+	if note == "" {
+		return existing
+	}
+	return note
 }
 
 func proofType(p *domain.Proof) string {
