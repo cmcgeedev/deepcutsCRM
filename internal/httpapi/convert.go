@@ -2,11 +2,13 @@ package httpapi
 
 import (
 	"database/sql"
+	"encoding/base64"
 	"time"
 
 	"github.com/cmcgeedev/deepcutsCRM/internal/api"
 	"github.com/cmcgeedev/deepcutsCRM/internal/auth"
 	"github.com/cmcgeedev/deepcutsCRM/internal/db/queries"
+	"github.com/cmcgeedev/deepcutsCRM/internal/domain"
 	"github.com/cmcgeedev/deepcutsCRM/internal/service"
 )
 
@@ -121,4 +123,85 @@ func toOrder(d service.OrderDetail) api.Order {
 		Notes: d.Order.Notes, NeedsReview: d.Order.NeedsReview, Lines: lines, TotalCents: d.TotalCents, RouteId: d.RouteID, StopId: d.StopID,
 		RouteStatus: strPtr(d.RouteStatus), CreatedAt: d.Order.CreatedAt, FinalizedAt: nullT(d.Order.FinalizedAt),
 	}
+}
+
+func toStop(sd service.StopDetail) api.Stop {
+	st := sd.Stop
+	out := api.Stop{
+		Id: st.ID, RouteId: st.RouteID, OrderId: st.OrderID, Sequence: st.Sequence, Status: api.StopStatus(st.Status), DeliveredAt: nullT(st.DeliveredAt),
+		SkipReason: st.SkipReason, DriverNote: st.DriverNote, CustomerName: sd.Customer.Name, DeliveryAddress: sd.Customer.DeliveryAddress,
+		Phone: sd.Customer.Phone, ContactName: sd.Customer.ContactName, DeliveryNotes: sd.Customer.DeliveryNotes,
+		OrderStatus: api.OrderStatus(sd.Order.Status), NeedsReview: sd.Order.NeedsReview, LineCount: sd.LineCount,
+	}
+	if st.ProofType.Valid {
+		pt := api.StopProofType(st.ProofType.String)
+		out.ProofType = &pt
+		if st.ProofType.String == "name" {
+			out.ProofName = strPtr(st.ProofRef.String)
+		} else {
+			out.HasProofImage = st.ProofRef.Valid
+		}
+	}
+	return out
+}
+
+func toRoute(rd service.RouteDetail) api.Route {
+	stops := make([]api.Stop, 0, len(rd.Stops))
+	for _, s := range rd.Stops {
+		stops = append(stops, toStop(s))
+	}
+	r := rd.Route
+	return api.Route{Id: r.ID, RouteDate: r.RouteDate, DriverUserId: r.DriverUserID, DriverName: rd.DriverName, TruckLabel: r.TruckLabel,
+		Status: api.RouteStatus(r.Status), OutAt: nullT(r.OutAt), CompletedAt: nullT(r.CompletedAt), Stops: stops}
+}
+
+func toDriverStop(ds service.DriverStop) api.DriverStop {
+	sd := service.StopDetail{Stop: ds.Stop, Order: ds.Order.Order, Customer: ds.Customer, LineCount: int64(len(ds.Order.Lines))}
+	return api.DriverStop{Stop: toStop(sd), Order: toOrder(ds.Order)}
+}
+
+func toDriverRoute(dr service.DriverRoute, driverName string) api.DriverRoute {
+	stops := make([]api.DriverStop, 0, len(dr.Stops))
+	for _, s := range dr.Stops {
+		stops = append(stops, toDriverStop(s))
+	}
+	r := dr.Route
+	return api.DriverRoute{
+		Route: api.Route{Id: r.ID, RouteDate: r.RouteDate, DriverUserId: r.DriverUserID, DriverName: driverName, TruckLabel: r.TruckLabel,
+			Status: api.RouteStatus(r.Status), OutAt: nullT(r.OutAt), CompletedAt: nullT(r.CompletedAt), Stops: []api.Stop{}},
+		Stops: stops,
+	}
+}
+
+func driverActionInput(in api.DriverAction) (domain.DriverAction, error) {
+	a := domain.DriverAction{ClientID: in.ClientId, Type: domain.ActionType(in.Type), Note: deref(in.Note), SkipReason: deref(in.SkipReason)}
+	if in.Proof != nil {
+		p := &domain.Proof{Type: domain.ProofType(in.Proof.Type), Name: deref(in.Proof.Name)}
+		if in.Proof.DataBase64 != nil {
+			if len(*in.Proof.DataBase64) > (domain.MaxProofBytes*4/3)+4 {
+				return a, service.Invalid(map[string]string{"proof": "image larger than 300 KB"})
+			}
+			data, err := base64.StdEncoding.DecodeString(*in.Proof.DataBase64)
+			if err != nil {
+				return a, service.Invalid(map[string]string{"proof": "dataBase64 is not valid base64"})
+			}
+			p.Data = data
+		}
+		a.Proof = p
+	}
+	if in.Lines != nil {
+		for _, l := range *in.Lines {
+			adj := domain.LineAdjustment{LineID: l.LineId, ShortageNote: l.ShortageNote}
+			if l.DeliveredQty != nil {
+				v := domain.Hundredths(*l.DeliveredQty)
+				adj.DeliveredQty = &v
+			}
+			if l.DeliveredWeight != nil {
+				v := domain.Hundredths(*l.DeliveredWeight)
+				adj.DeliveredWeight = &v
+			}
+			a.Lines = append(a.Lines, adj)
+		}
+	}
+	return a, nil
 }
