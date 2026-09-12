@@ -59,7 +59,6 @@ func notImplemented(name string) command {
 }
 
 var (
-	runServe  = notImplemented("serve")
-	runImport = notImplemented("import")
-	runSeed   = notImplemented("seed")
+	runServe = notImplemented("serve")
+	runSeed  = notImplemented("seed")
 )
