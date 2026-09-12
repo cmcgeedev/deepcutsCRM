@@ -2,6 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { RequireSession, SessionProvider } from "./auth/Session";
 import OfficeLayout from "./routes/office/Layout";
 import OfficeLogin from "./routes/office/Login";
+import Orders from "./routes/office/Orders";
+import OrderDetail from "./routes/office/OrderDetail";
 import Customers from "./routes/office/Customers";
 import CustomerDetail from "./routes/office/CustomerDetail";
 import Products from "./routes/office/Products";
@@ -18,8 +20,8 @@ function Office() {
         <Route element={<RequireSession><OfficeLayout /></RequireSession>}>
           <Route index element={<Navigate to="day" replace />} />
           <Route path="day" element={<Todo name="Day" />} />
-          <Route path="orders" element={<Todo name="Orders" />} />
-          <Route path="orders/:id" element={<Todo name="Order" />} />
+          <Route path="orders" element={<Orders />} />
+          <Route path="orders/:id" element={<OrderDetail />} />
           <Route path="customers" element={<Customers />} />
           <Route path="customers/:id" element={<CustomerDetail />} />
           <Route path="products" element={<Products />} />
