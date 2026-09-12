@@ -59,9 +59,8 @@ func notImplemented(name string) command {
 }
 
 var (
-	runServe   = notImplemented("serve")
-	runMigrate = notImplemented("migrate")
-	runImport  = notImplemented("import")
-	runUser    = notImplemented("user")
-	runSeed    = notImplemented("seed")
+	runServe  = notImplemented("serve")
+	runImport = notImplemented("import")
+	runUser   = notImplemented("user")
+	runSeed   = notImplemented("seed")
 )
