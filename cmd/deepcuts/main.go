@@ -53,12 +53,3 @@ func main() {
 		os.Exit(1)
 	}
 }
-
-func notImplemented(name string) command {
-	return func(config.Config, []string) error { return fmt.Errorf("%s: not implemented yet", name) }
-}
-
-var (
-	runServe = notImplemented("serve")
-	runSeed  = notImplemented("seed")
-)
