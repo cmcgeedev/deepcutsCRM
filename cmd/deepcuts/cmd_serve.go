@@ -23,7 +23,8 @@ import (
 )
 
 func runServe(cfg config.Config, args []string) error {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	d, err := db.OpenAndMigrate(ctx, cfg.DBPath)
 	if err != nil {
 		return err
@@ -45,8 +46,14 @@ func runServe(cfg config.Config, args []string) error {
 
 	go func() {
 		t := time.NewTicker(time.Hour)
-		for range t.C {
-			_ = queries.New(d).DeleteExpiredSessions(ctx, time.Now().UTC())
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				_ = queries.New(d).DeleteExpiredSessions(ctx, time.Now().UTC())
+			}
 		}
 	}()
 
@@ -73,8 +80,10 @@ func runServe(cfg config.Config, args []string) error {
 		return err
 	case <-stop:
 		fmt.Println("shutting down")
-		shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		defer cancel()
-		return srv.Shutdown(shutdownCtx)
+		shutdownCtx, shutdownCancel := context.WithTimeout(ctx, 5*time.Second)
+		defer shutdownCancel()
+		err := srv.Shutdown(shutdownCtx)
+		cancel()
+		return err
 	}
 }
