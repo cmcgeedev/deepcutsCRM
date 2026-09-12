@@ -90,6 +90,15 @@ func (q *Queries) DeleteSession(ctx context.Context, id string) error {
 	return err
 }
 
+const deleteUserSessions = `-- name: DeleteUserSessions :exec
+DELETE FROM sessions WHERE user_id = ?
+`
+
+func (q *Queries) DeleteUserSessions(ctx context.Context, userID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteUserSessions, userID)
+	return err
+}
+
 const getDriverByName = `-- name: GetDriverByName :one
 SELECT id, realm, display_name, email, password_hash, pin_hash, customer_id, active, created_at FROM users WHERE display_name = ? AND realm = 'driver'
 `

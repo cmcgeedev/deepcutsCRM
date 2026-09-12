@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -52,6 +53,20 @@ func ValidPIN(p string) bool { return pinRe.MatchString(p) }
 var ErrBadCredentials = service.Unauthorized("invalid credentials")
 var ErrRateLimited = &service.Error{Status: 429, Code: "rate_limited", Message: "too many attempts, try again later"}
 
+// dummyHash lets a failed lookup still pay for a bcrypt comparison, so a
+// nonexistent user/PIN and a wrong password/PIN cost the same amount of time.
+var (
+	dummyHashOnce sync.Once
+	dummyHash     []byte
+)
+
+func compareDummy(secret string) {
+	dummyHashOnce.Do(func() {
+		dummyHash, _ = bcrypt.GenerateFromPassword([]byte("dummy"), bcrypt.DefaultCost)
+	})
+	bcrypt.CompareHashAndPassword(dummyHash, []byte(secret))
+}
+
 func (a *Auth) CreateOfficeUser(ctx context.Context, email, displayName, password string) (queries.User, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if !strings.Contains(email, "@") {
@@ -59,6 +74,9 @@ func (a *Auth) CreateOfficeUser(ctx context.Context, email, displayName, passwor
 	}
 	if len(password) < 8 {
 		return queries.User{}, service.Invalid(map[string]string{"password": "must be at least 8 characters"})
+	}
+	if len(password) > 72 {
+		return queries.User{}, service.Invalid(map[string]string{"password": "must be at most 72 bytes"})
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -106,7 +124,11 @@ func (a *Auth) SetDriverPIN(ctx context.Context, displayName, pin string) error 
 	if err != nil {
 		return err
 	}
-	return a.Q.SetUserPinHash(ctx, queries.SetUserPinHashParams{PinHash: sql.NullString{String: string(hash), Valid: true}, ID: u.ID})
+	if err := a.Q.SetUserPinHash(ctx, queries.SetUserPinHashParams{PinHash: sql.NullString{String: string(hash), Valid: true}, ID: u.ID}); err != nil {
+		return err
+	}
+	// A new PIN invalidates any session created under the old one.
+	return a.Q.DeleteUserSessions(ctx, u.ID)
 }
 
 func (a *Auth) DeactivateUser(ctx context.Context, emailOrName string) error {
@@ -122,11 +144,15 @@ func (a *Auth) DeactivateUser(ctx context.Context, emailOrName string) error {
 
 func (a *Auth) LoginOffice(ctx context.Context, email, password, ip string) (Session, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
+	if len(email) > 254 {
+		return Session{}, ErrBadCredentials
+	}
 	if !a.Limiter.Allow("ip:"+ip) || !a.Limiter.Allow("email:"+email) {
 		return Session{}, ErrRateLimited
 	}
 	u, err := a.Q.GetUserByEmail(ctx, sql.NullString{String: email, Valid: true})
 	if err != nil || !u.Active || !u.PasswordHash.Valid {
+		compareDummy(password)
 		return Session{}, ErrBadCredentials
 	}
 	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash.String), []byte(password)) != nil {
@@ -138,12 +164,21 @@ func (a *Auth) LoginOffice(ctx context.Context, email, password, ip string) (Ses
 }
 
 func (a *Auth) LoginDriver(ctx context.Context, userID int64, pin, ip string) (Session, error) {
-	userKey := fmt.Sprintf("user:%d", userID)
-	if !a.Limiter.Allow("ip:"+ip) || !a.Limiter.Allow(userKey) {
+	if !a.Limiter.Allow("ip:" + ip) {
 		return Session{}, ErrRateLimited
 	}
 	u, err := a.Q.GetUser(ctx, userID)
-	if err != nil || u.Realm != RealmDriver || !u.Active || !u.PinHash.Valid {
+	if err != nil {
+		compareDummy(pin)
+		return Session{}, ErrBadCredentials
+	}
+	// Only mint/consume the per-user rate limit key once we know the user exists.
+	userKey := fmt.Sprintf("user:%d", u.ID)
+	if !a.Limiter.Allow(userKey) {
+		return Session{}, ErrRateLimited
+	}
+	if u.Realm != RealmDriver || !u.Active || !u.PinHash.Valid {
+		compareDummy(pin)
 		return Session{}, ErrBadCredentials
 	}
 	if bcrypt.CompareHashAndPassword([]byte(u.PinHash.String), []byte(pin)) != nil {

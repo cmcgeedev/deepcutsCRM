@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -69,19 +71,25 @@ func TestDriverPinAndRateLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// 9 failures still leave one attempt in the window; the 10th (correct)
+	// attempt must succeed and reset both the user and IP keys.
+	for i := 0; i < 9; i++ {
+		if _, err := a.LoginDriver(ctx, u.ID, "000000", "9.9.9.9"); err == nil {
+			t.Fatal("wrong pin must fail")
+		}
+	}
+	s, err := a.LoginDriver(ctx, u.ID, "123456", "9.9.9.9")
+	if err != nil || s.Realm != "driver" {
+		t.Fatalf("login on 10th attempt: %v", err)
+	}
+	// Reset-on-success means 10 more failures are allowed before lockout.
 	for i := 0; i < 10; i++ {
 		if _, err := a.LoginDriver(ctx, u.ID, "000000", "9.9.9.9"); err == nil {
 			t.Fatal("wrong pin must fail")
 		}
 	}
 	if _, err := a.LoginDriver(ctx, u.ID, "123456", "9.9.9.9"); err == nil {
-		t.Fatal("11th attempt must be rate limited even with the right pin")
-	}
-	a.Limiter.Reset("user:" + itoa(u.ID))
-	a.Limiter.Reset("ip:9.9.9.9")
-	s, err := a.LoginDriver(ctx, u.ID, "123456", "9.9.9.9")
-	if err != nil || s.Realm != "driver" {
-		t.Fatalf("login after reset: %v", err)
+		t.Fatal("11th attempt after reset must be rate limited even with the right pin")
 	}
 	if err := a.SetDriverPIN(ctx, "Sam", "654321"); err != nil {
 		t.Fatal(err)
@@ -124,17 +132,89 @@ func TestMiddlewareRealms(t *testing.T) {
 		a.Middleware(realm)(ok).ServeHTTP(rec, req)
 		return rec
 	}
+	assertUnauthorized := func(t *testing.T, rec *httptest.ResponseRecorder) {
+		t.Helper()
+		if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
+			t.Fatalf("expected application/json content type, got %q", ct)
+		}
+		var body map[string]string
+		if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if body["code"] != "unauthorized" || body["message"] != "login required" {
+			t.Fatalf("unexpected body: %+v", body)
+		}
+	}
 	if rec := call("driver", s.ID); rec.Code != 200 || rec.Body.String() != "Sam" {
 		t.Fatalf("driver realm: %d %s", rec.Code, rec.Body.String())
 	}
 	if rec := call("office", s.ID); rec.Code != 401 {
 		t.Fatalf("cross realm must be 401, got %d", rec.Code)
+	} else {
+		assertUnauthorized(t, rec)
 	}
 	if rec := call("driver", ""); rec.Code != 401 {
 		t.Fatalf("no cookie must be 401, got %d", rec.Code)
+	} else {
+		assertUnauthorized(t, rec)
 	}
 	if rec := call("driver", "garbage"); rec.Code != 401 {
 		t.Fatalf("bad cookie must be 401, got %d", rec.Code)
+	} else {
+		assertUnauthorized(t, rec)
+	}
+}
+
+func TestOfficeRateLimit(t *testing.T) {
+	a := newAuth(t)
+	if _, err := a.CreateOfficeUser(ctx, "o@x.com", "Olive", "correct horse"); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 10; i++ {
+		if _, err := a.LoginOffice(ctx, "o@x.com", "wrong", "2.2.2.2"); err == nil {
+			t.Fatal("wrong password must fail")
+		}
+	}
+	if _, err := a.LoginOffice(ctx, "o@x.com", "correct horse", "2.2.2.2"); !errors.Is(err, ErrRateLimited) {
+		t.Fatalf("11th attempt must be rate limited, got %v", err)
+	}
+}
+
+func TestRateLimitWindowRollover(t *testing.T) {
+	a := newAuth(t)
+	u, err := a.CreateDriver(ctx, "Sam", "123456")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 10; i++ {
+		a.LoginDriver(ctx, u.ID, "000000", "3.3.3.3")
+	}
+	if _, err := a.LoginDriver(ctx, u.ID, "123456", "3.3.3.3"); !errors.Is(err, ErrRateLimited) {
+		t.Fatalf("expected rate limited right after lockout, got %v", err)
+	}
+	base := a.Now()
+	a.Now = func() time.Time { return base.Add(16 * time.Minute) }
+	s, err := a.LoginDriver(ctx, u.ID, "123456", "3.3.3.3")
+	if err != nil || s.Realm != "driver" {
+		t.Fatalf("expected success once the 15 minute window rolls over: %v", err)
+	}
+}
+
+func TestSetDriverPINRevokesSessions(t *testing.T) {
+	a := newAuth(t)
+	u, err := a.CreateDriver(ctx, "Sam", "123456")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := a.LoginDriver(ctx, u.ID, "123456", "1.1.1.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.SetDriverPIN(ctx, "Sam", "654321"); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := a.Lookup(ctx, s.ID); ok {
+		t.Fatal("session created under the old PIN must not resolve after SetDriverPIN")
 	}
 }
 

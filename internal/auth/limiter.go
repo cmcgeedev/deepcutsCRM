@@ -19,6 +19,10 @@ type entry struct {
 	start time.Time
 }
 
+// maxEntries caps the limiter's memory: past this size, Allow sweeps expired
+// entries and, if still over the cap, evicts the oldest ones.
+const maxEntries = 10000
+
 func NewLimiter(max int, window time.Duration, now func() time.Time) *Limiter {
 	return &Limiter{max: max, window: window, now: now, hits: map[string]entry{}}
 }
@@ -34,7 +38,31 @@ func (l *Limiter) Allow(key string) bool {
 	}
 	e.count++
 	l.hits[key] = e
+	if len(l.hits) > maxEntries {
+		l.sweep(t)
+	}
 	return e.count <= l.max
+}
+
+// sweep removes entries whose window has elapsed; if the map is still over
+// maxEntries afterward, it evicts the oldest entries (by start) until it isn't.
+func (l *Limiter) sweep(t time.Time) {
+	for k, e := range l.hits {
+		if t.Sub(e.start) > l.window {
+			delete(l.hits, k)
+		}
+	}
+	for len(l.hits) > maxEntries {
+		var oldestKey string
+		var oldestStart time.Time
+		first := true
+		for k, e := range l.hits {
+			if first || e.start.Before(oldestStart) {
+				oldestKey, oldestStart, first = k, e.start, false
+			}
+		}
+		delete(l.hits, oldestKey)
+	}
 }
 
 func (l *Limiter) Reset(key string) {

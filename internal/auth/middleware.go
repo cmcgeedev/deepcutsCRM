@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -53,26 +54,34 @@ func ClearCookie(w http.ResponseWriter, secure bool) {
 	http.SetCookie(w, &http.Cookie{Name: CookieName, Value: "", Path: "/", HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode, Expires: time.Unix(0, 0), MaxAge: -1})
 }
 
-// ClientIP returns the remote IP without port. Behind Caddy, X-Forwarded-For's first entry wins.
+// ClientIP returns the remote IP without port. X-Forwarded-For is trusted
+// only when RemoteAddr itself is loopback or a private (RFC1918/ULA) address
+// -- i.e. when the request came through a trusted local reverse proxy such
+// as Caddy. Otherwise a client could spoof the header to dodge rate limits.
 func ClientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if i := indexByte(xff, ','); i > 0 {
-			return xff[:i]
-		}
-		return xff
-	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		return r.RemoteAddr
+		host = r.RemoteAddr
+	}
+	if isTrustedProxy(host) {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			first := xff
+			if i := strings.IndexByte(xff, ','); i > 0 {
+				first = xff[:i]
+			}
+			first = strings.TrimSpace(first)
+			if net.ParseIP(first) != nil {
+				return first
+			}
+		}
 	}
 	return host
 }
 
-func indexByte(s string, b byte) int {
-	for i := 0; i < len(s); i++ {
-		if s[i] == b {
-			return i
-		}
+func isTrustedProxy(host string) bool {
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
 	}
-	return -1
+	return ip.IsLoopback() || ip.IsPrivate()
 }
