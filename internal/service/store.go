@@ -12,10 +12,11 @@ import (
 )
 
 type Service struct {
-	DB  *sql.DB
-	Q   *queries.Queries
-	Now func() time.Time
-	Loc *time.Location
+	DB     *sql.DB
+	Q      *queries.Queries
+	Now    func() time.Time
+	Loc    *time.Location
+	Proofs ProofStore
 }
 
 func New(d *sql.DB, loc *time.Location) *Service {
