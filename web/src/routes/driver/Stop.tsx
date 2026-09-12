@@ -41,6 +41,7 @@ export default function Stop() {
   }
 
   async function send(body: Omit<Schemas["DriverAction"], "clientId">) {
+    if (busy) return;
     setBusy(true);
     setErr(null);
     try {
@@ -104,21 +105,21 @@ export default function Stop() {
         <div className="actions">
           <input placeholder="note for the office" value={note} onChange={(e) => setNote(e.target.value)} />
           <button onClick={() => { try { send({ type: "adjust", lines: adjustments(), note }); } catch (ex) { setErr({ code: "invalid", message: (ex as Error).message }); } }} disabled={busy}>Save adjustments</button>
-          <button className="link" onClick={() => setMode("view")}>Cancel</button>
+          <button className="link" onClick={() => { setMode("view"); setAdj({}); }}>Cancel</button>
         </div>
       )}
       {mode === "proof" && (
         <>
           <h2>Proof of delivery</h2>
           <input placeholder="note for the office (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
-          <ProofCapture onCancel={() => setMode("view")} onDone={(proof) => { try { send({ type: "deliver", proof, lines: adjustments(), note }); } catch (ex) { setErr({ code: "invalid", message: (ex as Error).message }); } }} />
+          <ProofCapture busy={busy} onCancel={() => setMode("view")} onDone={(proof) => { try { send({ type: "deliver", proof, lines: adjustments(), note }); } catch (ex) { setErr({ code: "invalid", message: (ex as Error).message }); } }} />
         </>
       )}
       {mode === "skip" && (
         <div className="actions card">
           <label>Reason<input value={skipReason} onChange={(e) => setSkipReason(e.target.value)} autoFocus /></label>
           <button className="danger" disabled={!skipReason.trim() || busy} onClick={() => send({ type: "skip", skipReason: skipReason.trim(), note })}>Confirm skip</button>
-          <button className="link" onClick={() => setMode("view")}>Cancel</button>
+          <button className="link" onClick={() => { setMode("view"); setSkipReason(""); }}>Cancel</button>
         </div>
       )}
     </>

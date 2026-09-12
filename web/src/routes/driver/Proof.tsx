@@ -27,7 +27,7 @@ export async function shrinkImage(file: File): Promise<string> {
   throw new Error("photo could not be reduced under 300 KB");
 }
 
-export function ProofCapture({ onDone, onCancel }: { onDone: (p: Proof) => void; onCancel: () => void }) {
+export function ProofCapture({ onDone, onCancel, busy = false }: { onDone: (p: Proof) => void; onCancel: () => void; busy?: boolean }) {
   const [tab, setTab] = useState<"signature" | "photo" | "name">("signature");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const padRef = useRef<SignaturePad | null>(null);
@@ -65,12 +65,12 @@ export function ProofCapture({ onDone, onCancel }: { onDone: (p: Proof) => void;
       </div>
       {tab === "signature" && <>
         <canvas ref={canvasRef} className="sig" aria-label="signature area" />
-        <div className="row"><button type="button" className="secondary" onClick={() => padRef.current?.clear()}>Clear</button><button type="button" onClick={doneSignature}>Use signature</button></div>
+        <div className="row"><button type="button" className="secondary" onClick={() => padRef.current?.clear()} disabled={busy}>Clear</button><button type="button" onClick={doneSignature} disabled={busy}>Use signature</button></div>
       </>}
-      {tab === "photo" && <label>Take a photo of the delivery<input type="file" accept="image/*" capture="environment" onChange={(e) => donePhoto(e.target.files?.[0])} /></label>}
+      {tab === "photo" && <label>Take a photo of the delivery<input type="file" accept="image/*" capture="environment" onChange={(e) => donePhoto(e.target.files?.[0])} disabled={busy} /></label>}
       {tab === "name" && <>
         <label>Received by<input value={name} onChange={(e) => setName(e.target.value)} autoFocus /></label>
-        <button type="button" disabled={!name.trim()} onClick={() => onDone({ type: "name", name: name.trim() })}>Use name</button>
+        <button type="button" disabled={!name.trim() || busy} onClick={() => onDone({ type: "name", name: name.trim() })}>Use name</button>
       </>}
       {err && <p className="error">{err}</p>}
       <button type="button" className="link" onClick={onCancel}>Cancel</button>
