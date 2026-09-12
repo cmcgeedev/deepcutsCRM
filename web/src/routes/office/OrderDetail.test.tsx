@@ -27,5 +27,6 @@ describe("OrderDetail", () => {
     expect(screen.getAllByText("$658.80").length).toBeGreaterThan(0); // line amount and total
     expect(screen.getByText(/estimated/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /confirm/i })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("shortage note")).toBeEnabled();
   });
 });

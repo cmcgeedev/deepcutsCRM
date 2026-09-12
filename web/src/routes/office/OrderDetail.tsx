@@ -20,6 +20,7 @@ function scope(o: Order) {
 
 function LineRow({ o, l, onPatch, onDelete }: { o: Order; l: Line; onPatch: (lineId: number, body: Schemas["LinePatch"]) => Promise<ApiError | null>; onDelete: (lineId: number) => void }) {
   const s = scope(o);
+  const shortageEditable = s.lines || s.shippedAndPrice || s.delivered;
   const [err, setErr] = useState<ApiError | null>(null);
   const [edit, setEdit] = useState<{ orderedQty: string; unitPrice: string; shippedWeight: string; deliveredQty: string; deliveredWeight: string; shortageNote: string }>({
     orderedQty: hundredths(l.orderedQty), unitPrice: (l.unitPriceCents / 100).toFixed(2), shippedWeight: l.shippedWeight != null ? hundredths(l.shippedWeight) : "",
@@ -28,25 +29,25 @@ function LineRow({ o, l, onPatch, onDelete }: { o: Order; l: Line; onPatch: (lin
   async function commit(field: keyof typeof edit) {
     const body: Schemas["LinePatch"] = {};
     const v = edit[field];
-    if (field === "orderedQty") { const n = toHundredths(v); if (n == null) return setErr({ code: "invalid", message: "quantity must be a number" }); body.orderedQty = n; }
-    if (field === "unitPrice") { const n = toCents(v); if (n == null) return setErr({ code: "invalid", message: "price must be a dollar amount" }); body.unitPriceCents = n; }
-    if (field === "shippedWeight") { if (v === "") return; const n = toHundredths(v); if (n == null) return setErr({ code: "invalid", message: "weight must be a number" }); body.shippedWeight = n; }
-    if (field === "deliveredQty") { if (v === "") return; const n = toHundredths(v); if (n == null) return setErr({ code: "invalid", message: "quantity must be a number" }); body.deliveredQty = n; }
-    if (field === "deliveredWeight") { if (v === "") return; const n = toHundredths(v); if (n == null) return setErr({ code: "invalid", message: "weight must be a number" }); body.deliveredWeight = n; }
-    if (field === "shortageNote") body.shortageNote = v;
+    if (field === "orderedQty") { const n = toHundredths(v); if (n == null) return setErr({ code: "invalid", message: "quantity must be a number" }); if (n === l.orderedQty) return; body.orderedQty = n; }
+    if (field === "unitPrice") { const n = toCents(v); if (n == null) return setErr({ code: "invalid", message: "price must be a dollar amount" }); if (n === l.unitPriceCents) return; body.unitPriceCents = n; }
+    if (field === "shippedWeight") { if (v === "") return; const n = toHundredths(v); if (n == null) return setErr({ code: "invalid", message: "weight must be a number" }); if (n === l.shippedWeight) return; body.shippedWeight = n; }
+    if (field === "deliveredQty") { if (v === "") return; const n = toHundredths(v); if (n == null) return setErr({ code: "invalid", message: "quantity must be a number" }); if (n === l.deliveredQty) return; body.deliveredQty = n; }
+    if (field === "deliveredWeight") { if (v === "") return; const n = toHundredths(v); if (n == null) return setErr({ code: "invalid", message: "weight must be a number" }); if (n === l.deliveredWeight) return; body.deliveredWeight = n; }
+    if (field === "shortageNote") { if (v === l.shortageNote) return; body.shortageNote = v; }
     setErr(await onPatch(l.id, body));
   }
-  const num = (field: keyof typeof edit, enabled: boolean) => (
-    <input className="short" value={edit[field]} disabled={!enabled} onChange={(e) => setEdit({ ...edit, [field]: e.target.value })} onBlur={() => enabled && commit(field)} />
+  const num = (field: keyof typeof edit) => (
+    <input className="short" value={edit[field]} onChange={(e) => setEdit({ ...edit, [field]: e.target.value })} onBlur={() => commit(field)} />
   );
   return (
     <tr>
       <td>{l.sku}<br /><span className="muted">{l.productName}</span></td>
-      <td>{s.lines ? num("orderedQty", true) : qty(l.orderedQty, l.sellUnit)}{l.catchWeight && <div className="muted">est {lb(l.estWeight)}</div>}</td>
-      <td>{s.shippedAndPrice ? num("unitPrice", true) : money(l.unitPriceCents)}{l.priceOverridden && <div className="muted">overridden</div>}<div className="muted">{l.catchWeight ? "/lb" : `/${l.sellUnit}`}</div></td>
-      <td>{l.catchWeight ? (s.shippedAndPrice ? num("shippedWeight", true) : lb(l.shippedWeight)) : "—"}</td>
-      <td>{s.delivered ? <>{num("deliveredQty", true)}{l.catchWeight && <> {num("deliveredWeight", true)}</>}</> : <>{l.deliveredQty != null ? qty(l.deliveredQty, l.sellUnit) : "—"}{l.catchWeight && <div className="muted">{lb(l.deliveredWeight)}</div>}</>}
-        {(s.delivered || l.shortageNote) && <input value={edit.shortageNote} disabled={!s.delivered} placeholder="shortage note" onChange={(e) => setEdit({ ...edit, shortageNote: e.target.value })} onBlur={() => s.delivered && commit("shortageNote")} />}
+      <td>{s.lines ? num("orderedQty") : qty(l.orderedQty, l.sellUnit)}{l.catchWeight && <div className="muted">est {lb(l.estWeight)}</div>}</td>
+      <td>{s.shippedAndPrice ? num("unitPrice") : money(l.unitPriceCents)}{l.priceOverridden && <div className="muted">overridden</div>}<div className="muted">{l.catchWeight ? "/lb" : `/${l.sellUnit}`}</div></td>
+      <td>{l.catchWeight ? (s.shippedAndPrice ? num("shippedWeight") : lb(l.shippedWeight)) : "—"}</td>
+      <td>{s.delivered ? <>{num("deliveredQty")}{l.catchWeight && <> {num("deliveredWeight")}</>}</> : <>{l.deliveredQty != null ? qty(l.deliveredQty, l.sellUnit) : "—"}{l.catchWeight && <div className="muted">{lb(l.deliveredWeight)}</div>}</>}
+        {(shortageEditable || l.shortageNote) && <input value={edit.shortageNote} disabled={!shortageEditable} placeholder="shortage note" onChange={(e) => setEdit({ ...edit, shortageNote: e.target.value })} onBlur={() => shortageEditable && commit("shortageNote")} />}
       </td>
       <td className="num">{money(l.amountCents)}<div className="muted">{l.amountSource}</div></td>
       <td>{s.lines && <button className="link" onClick={() => onDelete(l.id)}>remove</button>}{err && <div className="error">{err.message}</div>}</td>
