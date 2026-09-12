@@ -45,7 +45,9 @@ func NewRouter(d Deps) http.Handler {
 		g.Post("/api/driver/logout", s.logout)
 		g.Get("/api/office/stops/{stopId}/proof", s.getStopProof)
 		strict := api.NewStrictHandlerWithOptions(s, nil, api.StrictHTTPServerOptions{
-			RequestErrorHandlerFunc:  func(w http.ResponseWriter, r *http.Request, err error) { writeError(w, service.Invalid(map[string]string{"body": err.Error()})) },
+			RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+				writeError(w, service.Invalid(map[string]string{"body": err.Error()}))
+			},
 			ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) { writeError(w, err) },
 		})
 		api.HandlerWithOptions(strict, api.ChiServerOptions{BaseRouter: g, ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {

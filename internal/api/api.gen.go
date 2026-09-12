@@ -315,6 +315,12 @@ type DriverActionResult struct {
 	Stop    DriverStop `json:"stop"`
 }
 
+// DriverLogin defines model for DriverLogin.
+type DriverLogin struct {
+	Pin    string `json:"pin"`
+	UserId int64  `json:"userId"`
+}
+
 // DriverRoute defines model for DriverRoute.
 type DriverRoute struct {
 	Route Route        `json:"route"`
@@ -356,6 +362,12 @@ type LinePatch struct {
 	ShippedWeight   *int64  `json:"shippedWeight,omitempty"`
 	ShortageNote    *string `json:"shortageNote,omitempty"`
 	UnitPriceCents  *int64  `json:"unitPriceCents,omitempty"`
+}
+
+// OfficeLogin defines model for OfficeLogin.
+type OfficeLogin struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 // Order defines model for Order.

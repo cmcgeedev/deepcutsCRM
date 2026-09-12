@@ -9,22 +9,8 @@ import (
 	"github.com/cmcgeedev/deepcutsCRM/internal/service"
 )
 
-// officeLoginRequest and driverLoginRequest mirror the OfficeLogin/DriverLogin
-// schemas in api/openapi.yaml. oapi-codegen prunes schemas that are referenced
-// only by an excluded operation's requestBody, so those two model types are not
-// generated into internal/api; these local structs keep the same JSON shape.
-type officeLoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-type driverLoginRequest struct {
-	UserId int64  `json:"userId"`
-	Pin    string `json:"pin"`
-}
-
 func (s *Server) officeLogin(w http.ResponseWriter, r *http.Request) {
-	var in officeLoginRequest
+	var in api.OfficeLogin
 	if err := decode(r, &in); err != nil {
 		writeError(w, err)
 		return
@@ -43,7 +29,7 @@ func (s *Server) officeLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) driverLogin(w http.ResponseWriter, r *http.Request) {
-	var in driverLoginRequest
+	var in api.DriverLogin
 	if err := decode(r, &in); err != nil {
 		writeError(w, err)
 		return

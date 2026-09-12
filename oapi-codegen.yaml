@@ -6,6 +6,7 @@ generate:
   models: true
   embedded-spec: false
 output-options:
+  skip-prune: true
   exclude-operation-ids:
     - officeLogin
     - officeLogout
