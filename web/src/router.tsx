@@ -10,8 +10,9 @@ import CustomerDetail from "./routes/office/CustomerDetail";
 import Products from "./routes/office/Products";
 import ProductDetail from "./routes/office/ProductDetail";
 import DriverLayout from "./routes/driver/Layout";
-
-const Todo = ({ name }: { name: string }) => <h1>{name}</h1>;
+import DriverLogin from "./routes/driver/Login";
+import DriverRoute from "./routes/driver/Route";
+import Stop from "./routes/driver/Stop";
 
 function Office() {
   return (
@@ -38,11 +39,11 @@ function Driver() {
   return (
     <SessionProvider realm="driver">
       <Routes>
-        <Route path="login" element={<Todo name="Driver login" />} />
+        <Route path="login" element={<DriverLogin />} />
         <Route element={<RequireSession><DriverLayout /></RequireSession>}>
           <Route index element={<Navigate to="route" replace />} />
-          <Route path="route" element={<Todo name="Route" />} />
-          <Route path="stops/:id" element={<Todo name="Stop" />} />
+          <Route path="route" element={<DriverRoute />} />
+          <Route path="stops/:id" element={<Stop />} />
           <Route path="*" element={<Navigate to="route" replace />} />
         </Route>
       </Routes>
