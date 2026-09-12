@@ -32,7 +32,10 @@ var _ api.StrictServerInterface = (*Server)(nil)
 
 func NewRouter(d Deps) http.Handler {
 	r := chi.NewRouter()
-	r.Use(middleware.RealIP, middleware.Recoverer, middleware.NoCache)
+	// middleware.RealIP is deliberately omitted: it overwrites r.RemoteAddr from
+	// X-Forwarded-For unconditionally, which would defeat auth.ClientIP's
+	// trusted-proxy check and make the per-IP login limiter spoofable.
+	r.Use(middleware.Recoverer, middleware.NoCache, middleware.RequestSize(1<<20))
 	s := &Server{d: d}
 
 	r.Post("/api/office/login", s.officeLogin)
@@ -46,12 +49,12 @@ func NewRouter(d Deps) http.Handler {
 		g.Get("/api/office/stops/{stopId}/proof", s.getStopProof)
 		strict := api.NewStrictHandlerWithOptions(s, nil, api.StrictHTTPServerOptions{
 			RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-				writeError(w, service.Invalid(map[string]string{"body": err.Error()}))
+				writeError(w, service.Invalid(map[string]string{"body": "malformed or oversized request body"}))
 			},
 			ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) { writeError(w, err) },
 		})
 		api.HandlerWithOptions(strict, api.ChiServerOptions{BaseRouter: g, ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeError(w, service.Invalid(map[string]string{"request": err.Error()}))
+			writeError(w, service.Invalid(map[string]string{"request": "invalid path or query parameter"}))
 		}})
 	})
 
