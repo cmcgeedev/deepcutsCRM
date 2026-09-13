@@ -41,7 +41,7 @@ func runServe(cfg config.Config, args []string) error {
 	if err != nil {
 		return err
 	}
-	handler := httpapi.NewRouter(httpapi.Deps{Svc: svc, Auth: a, Proofs: proofs, Secure: cfg.TLS(), Web: webFS})
+	handler := httpapi.NewRouter(httpapi.Deps{Svc: svc, Auth: a, Proofs: proofs, Secure: cfg.TLS() || cfg.SecureCookies, Web: webFS})
 	srv := &http.Server{Addr: cfg.Addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 
 	go func() {

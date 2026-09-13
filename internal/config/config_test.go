@@ -17,6 +17,22 @@ func TestDefaults(t *testing.T) {
 	if c.Timezone != "America/New_York" || c.Location == nil {
 		t.Fatalf("bad tz: %+v", c)
 	}
+	if c.SecureCookies {
+		t.Fatalf("SecureCookies should default false: %+v", c)
+	}
+}
+
+func TestSecureCookies(t *testing.T) {
+	c, err := FromEnv(env(map[string]string{"DEEPCUTS_SECURE_COOKIES": "true"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.SecureCookies {
+		t.Fatalf("expected SecureCookies=true: %+v", c)
+	}
+	if _, err := FromEnv(env(map[string]string{"DEEPCUTS_SECURE_COOKIES": "yesplease"})); err == nil {
+		t.Fatal("expected error for a non-boolean DEEPCUTS_SECURE_COOKIES")
+	}
 }
 
 func TestOverridesAndBadTimezone(t *testing.T) {

@@ -31,7 +31,9 @@ Office: `/office`. Driver: `/driver`.
 
 CSV formats: `docs/import-formats.md`. Config is environment only:
 `DEEPCUTS_DB_PATH` (data/deepcuts.sqlite), `DEEPCUTS_DATA_DIR` (data), `DEEPCUTS_ADDR` (:8080),
-`DEEPCUTS_TIMEZONE` (America/New_York), `DEEPCUTS_TLS_CERT` / `DEEPCUTS_TLS_KEY`.
+`DEEPCUTS_TIMEZONE` (America/New_York), `DEEPCUTS_TLS_CERT` / `DEEPCUTS_TLS_KEY`,
+`DEEPCUTS_SECURE_COOKIES` (bool, default false -- set true when running behind a
+TLS-terminating proxy so session cookies are still marked Secure).
 
 ## Development
 

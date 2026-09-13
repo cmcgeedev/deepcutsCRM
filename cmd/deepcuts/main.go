@@ -5,6 +5,11 @@ import (
 	"fmt"
 	"os"
 
+	// Embeds the IANA timezone database in the binary so DEEPCUTS_TIMEZONE
+	// (e.g. America/New_York) loads correctly on minimal runtime images that
+	// don't ship /usr/share/zoneinfo.
+	_ "time/tzdata"
+
 	"github.com/cmcgeedev/deepcutsCRM/internal/config"
 )
 

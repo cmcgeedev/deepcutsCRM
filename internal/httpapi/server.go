@@ -35,7 +35,7 @@ func NewRouter(d Deps) http.Handler {
 	// middleware.RealIP is deliberately omitted: it overwrites r.RemoteAddr from
 	// X-Forwarded-For unconditionally, which would defeat auth.ClientIP's
 	// trusted-proxy check and make the per-IP login limiter spoofable.
-	r.Use(middleware.Recoverer, middleware.NoCache, middleware.RequestSize(1<<20))
+	r.Use(middleware.Logger, middleware.Recoverer, middleware.NoCache, middleware.RequestSize(1<<20))
 	s := &Server{d: d}
 
 	r.Post("/api/office/login", s.officeLogin)
