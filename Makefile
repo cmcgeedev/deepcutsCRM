@@ -23,10 +23,10 @@ build-linux: build-web
 	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o bin/deepcuts-linux-arm64 ./cmd/deepcuts
 
 test-go:
-	go vet ./... && go test ./...
+	go vet ./cmd/... ./internal/... ./web && go test ./cmd/... ./internal/... ./web
 
 test-web:
-	cd web && npm test -- --run
+	cd web && npm test -- --run && npm run lint
 
 test: test-go test-web
 

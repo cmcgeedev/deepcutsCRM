@@ -15,7 +15,7 @@ jobs:
       - run: cd web && npm ci --no-audit --no-fund
       - run: go tool sqlc generate && go tool oapi-codegen -config oapi-codegen.yaml api/openapi.yaml && (cd web && npm run generate)
       - run: git diff --exit-code -- internal/db/queries internal/api web/src/api/schema.d.ts
-      - run: go vet ./... && go test ./...
-      - run: cd web && npx vitest run && npx tsc -b && npm run build
+      - run: go vet ./cmd/... ./internal/... ./web && go test ./cmd/... ./internal/... ./web
+      - run: cd web && npx vitest run && npx tsc -b && npm run lint && npm run build
       - run: go build -o bin/deepcuts ./cmd/deepcuts
       - run: ./scripts/e2e.sh

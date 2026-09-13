@@ -163,7 +163,7 @@ func Demo(ctx context.Context, svc *service.Service, a *auth.Auth) (Info, error)
 			return err
 		}
 		od, _ := svc.GetOrder(ctx, st.OrderID)
-		act := domain.DriverAction{ClientID: clientID, Type: domain.ActionDeliver, Proof: &domain.Proof{Type: domain.ProofName, Name: "Received by " + od.Customer.ContactName}}
+		act := domain.DriverAction{ClientID: clientID, Type: domain.ActionDeliver, Proof: &domain.Proof{Type: domain.ProofName, Name: od.Customer.ContactName}}
 		if adjust && len(od.Lines) > 0 {
 			short := domain.Hundredths(0)
 			note := "customer refused, temperature"
