@@ -11,14 +11,23 @@ export default function DriverLogin() {
   const [userId, setUserId] = useState(0);
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const res = await api.POST("/api/driver/login", { body: { userId, pin } });
-    const err = errorOf(res);
-    if (err) return setError(err.code === "rate_limited" ? err.message : "Wrong PIN");
-    setUser(res.data!);
-    nav("/driver/route", { replace: true });
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.POST("/api/driver/login", { body: { userId, pin } });
+      const err = errorOf(res);
+      if (err) return setError(err.code === "rate_limited" ? err.message : "Wrong PIN");
+      setUser(res.data!);
+      nav("/driver/route", { replace: true });
+    } catch {
+      setError("Can't reach the server. Check that it is running, then try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -33,7 +42,7 @@ export default function DriverLogin() {
         </label>
         <label>PIN<input type="password" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value)} autoComplete="off" required /></label>
         {error && <p className="error" role="alert">{error}</p>}
-        <button disabled={!userId || pin.length !== 6}>Start</button>
+        <button disabled={busy || !userId || pin.length !== 6}>Start</button>
       </form>
     </main>
   );

@@ -15,12 +15,17 @@ export default function OfficeLogin() {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const res = await api.POST("/api/office/login", { body: { email, password } });
-    setBusy(false);
-    const err = errorOf(res);
-    if (err) return setError(err.message);
-    setUser(res.data!);
-    nav("/office/day", { replace: true });
+    try {
+      const res = await api.POST("/api/office/login", { body: { email, password } });
+      const err = errorOf(res);
+      if (err) return setError(err.message);
+      setUser(res.data!);
+      nav("/office/day", { replace: true });
+    } catch {
+      setError("Can't reach the server. Check that it is running, then try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
