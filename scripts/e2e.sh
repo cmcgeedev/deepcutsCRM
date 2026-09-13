@@ -11,7 +11,10 @@ DB=$T/e2e.sqlite
 JAR=$T/office.jar
 DJAR=$T/driver.jar
 API=http://localhost:$PORT/api
-TODAY=$(date +%F)
+# Match the server's business timezone (DEEPCUTS_TIMEZONE, default America/New_York)
+# rather than the system zone, so TODAY agrees with what the server considers "today".
+export DEEPCUTS_TIMEZONE=UTC
+TODAY=$(date -u +%F)
 
 make -s build >/dev/null
 DEEPCUTS_DB_PATH=$DB DEEPCUTS_DATA_DIR=$T $BIN seed demo >/dev/null

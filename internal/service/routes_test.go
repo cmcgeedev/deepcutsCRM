@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/cmcgeedev/deepcutsCRM/internal/db/queries"
+	"github.com/cmcgeedev/deepcutsCRM/internal/domain"
 )
 
 func (f fixture) confirmedOrder(t *testing.T, date string) int64 {
@@ -116,4 +117,35 @@ func mustLine(t *testing.T, f fixture, orderID int64) int64 {
 	o, err := f.s.GetOrder(ctx, orderID)
 	mustNoErr(t, err)
 	return o.Lines[0].Line.ID
+}
+
+func TestCreateRouteRejectsDuplicateForDriverDate(t *testing.T) {
+	f := newFixture(t)
+	drv := f.driver(t, "Sam")
+	o1 := f.confirmedOrder(t, "2026-09-12")
+	r, err := f.s.CreateRoute(ctx, RouteInput{RouteDate: "2026-09-12", DriverUserID: drv})
+	mustNoErr(t, err)
+
+	// A second non-complete route for the same driver and date is rejected.
+	_, err = f.s.CreateRoute(ctx, RouteInput{RouteDate: "2026-09-12", DriverUserID: drv})
+	wantCode(t, err, "duplicate_route")
+
+	// A different date, or a different driver, is unaffected.
+	_, err = f.s.CreateRoute(ctx, RouteInput{RouteDate: "2026-09-13", DriverUserID: drv})
+	mustNoErr(t, err)
+	other := f.driver(t, "Jordan")
+	_, err = f.s.CreateRoute(ctx, RouteInput{RouteDate: "2026-09-12", DriverUserID: other})
+	mustNoErr(t, err)
+
+	// Once the driver's original route is complete, a new one for that date is allowed again.
+	r, err = f.s.AddStop(ctx, r.Route.ID, o1)
+	mustNoErr(t, err)
+	r, err = f.s.RouteOut(ctx, r.Route.ID)
+	mustNoErr(t, err)
+	_, _, err = f.s.ApplyDriverAction(ctx, drv, r.Stops[0].Stop.ID, domain.DriverAction{ClientID: "11111111-1111-1111-1111-111111111111", Type: domain.ActionSkip, SkipReason: "closed"})
+	mustNoErr(t, err)
+	_, err = f.s.RouteComplete(ctx, r.Route.ID)
+	mustNoErr(t, err)
+	_, err = f.s.CreateRoute(ctx, RouteInput{RouteDate: "2026-09-12", DriverUserID: drv})
+	mustNoErr(t, err)
 }

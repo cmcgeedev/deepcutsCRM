@@ -48,6 +48,13 @@ func (s *Service) CreateRoute(ctx context.Context, in RouteInput) (RouteDetail, 
 		if err != nil || u.Realm != "driver" || !u.Active {
 			return NotFound("driver")
 		}
+		_, err = q.GetRouteForDriverDate(ctx, queries.GetRouteForDriverDateParams{DriverUserID: in.DriverUserID, RouteDate: in.RouteDate})
+		if err == nil {
+			return Conflict("duplicate_route", "this driver already has a route for that date")
+		}
+		if err != sql.ErrNoRows {
+			return err
+		}
 		r, err := q.CreateRoute(ctx, queries.CreateRouteParams{RouteDate: in.RouteDate, DriverUserID: in.DriverUserID, TruckLabel: in.TruckLabel, CreatedAt: s.now()})
 		if err != nil {
 			return err
