@@ -29,8 +29,9 @@ export function openDB() {
   return dbp;
 }
 
-export async function saveRoute(route: DriverRoute) { (await openDB()).put("route", { route, savedAt: Date.now() }, "current"); }
+export async function saveRoute(route: DriverRoute) { await (await openDB()).put("route", { route, savedAt: Date.now() }, "current"); }
 export async function loadRoute(): Promise<DriverRoute | null> { return (await (await openDB()).get("route", "current"))?.route ?? null; }
+export async function clearRoute(): Promise<void> { await (await openDB()).delete("route", "current"); }
 export async function putQueue(item: QueueItem) { await (await openDB()).put("queue", item); }
 export async function listQueue(): Promise<QueueItem[]> { return (await openDB()).getAllFromIndex("queue", "byCreated"); }
 export async function deleteQueue(clientId: string) { await (await openDB()).delete("queue", clientId); }

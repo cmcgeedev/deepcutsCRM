@@ -1,8 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, errorOf, type ApiError } from "../api/client";
-import { loadRoute, saveRoute } from "./db";
+import { clearRoute, loadRoute, saveRoute } from "./db";
 import { applyLocally, enqueue, flush, startAutoFlush, subscribe } from "./queue";
 import type { DriverAction, DriverRoute, QueueItem } from "./types";
+
+/** Browser-local YYYY-MM-DD, matching how routeDate is compared (not UTC). */
+function localToday(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Cached route, but only if it's today's -- an older cached route is cleared and ignored. */
+async function loadFreshRoute(): Promise<DriverRoute | null> {
+  const cached = await loadRoute();
+  if (!cached) return null;
+  if (cached.route.routeDate !== localToday()) { await clearRoute(); return null; }
+  return cached;
+}
 
 export function useRoute() {
   const [server, setServer] = useState<DriverRoute | null>(null);
@@ -16,7 +30,17 @@ export function useRoute() {
     startAutoFlush();
     const on = () => setOnline(true), off = () => setOnline(false);
     window.addEventListener("online", on); window.addEventListener("offline", off);
-    const unsub = subscribe(setQueue);
+    // Reload the cached route on every queue change (enqueue, and after each flush)
+    // so a server-confirmed merge (see queue.ts's mergeStop) is picked up without
+    // waiting for the next GET -- a successful send must never regress the display.
+    // Await the cache read before either setState so React batches route+queue into
+    // one render -- otherwise the queue empties a render ahead of the merged route
+    // landing, and the stop flickers back to "pending" for a frame.
+    const unsub = subscribe(async (items) => {
+      const r = await loadFreshRoute();
+      if (r) setServer(r);
+      setQueue(items);
+    });
     return () => { unsub(); window.removeEventListener("online", on); window.removeEventListener("offline", off); };
   }, []);
 
@@ -24,18 +48,21 @@ export function useRoute() {
     let alive = true;
     setLoading(true);
     (async () => {
-      await flush(true);
-      const cached = await loadRoute();
-      if (cached && alive) setServer(cached);
+      const fresh = await loadFreshRoute();
+      if (fresh && alive) setServer(fresh);
+      // Don't block the first paint on the sync queue: read the cache immediately
+      // and let the flush (which has its own 20s request timeout) run in the background.
+      flush(true).catch(() => {});
       try {
         const r = await api.GET("/api/driver/route");
         if (!alive) return;
         const e = errorOf(r);
         if (r.data) { setServer(r.data); await saveRoute(r.data); setError(null); }
         else if (e?.code === "not_found") { setServer(null); setError(null); }
-        else if (!cached) setError(e);
+        else if (r.response.status === 401) { setError(e); }
+        else if (!fresh) setError(e);
       } catch {
-        if (!cached && alive) setError({ code: "offline", message: "No connection and no cached route" });
+        if (!fresh && alive) setError({ code: "offline", message: "No connection and no cached route" });
       } finally {
         if (alive) setLoading(false);
       }
@@ -64,7 +91,7 @@ export function useRoute() {
     if (mine?.status === "stuck") return { code: "stuck", message: mine.error ?? "could not send" };
     if (!mine) {
       // delivered to the server: refresh the cached copy in the background
-      api.GET("/api/driver/route").then((r) => { if (r.data) { setServer(r.data); saveRoute(r.data); } });
+      api.GET("/api/driver/route").then((r) => { if (r.data) { setServer(r.data); saveRoute(r.data); } }).catch(() => {});
     }
     return null;
   }, []);

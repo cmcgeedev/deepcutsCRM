@@ -13,6 +13,7 @@ export default function DriverRoute() {
   if (error) return <><ErrorBanner error={error} /><button onClick={reload}>Retry</button></>;
   if (!route) return <><h1>No route today</h1><p className="muted">Nothing is assigned to you for today.</p><button className="secondary" onClick={reload}>Refresh</button></>;
   const done = route.stops.every((s) => s.stop.status !== "pending");
+  const unsynced = Object.values(pending).reduce((a, b) => a + b, 0);
 
   async function finish() {
     if (busy) return;
@@ -41,7 +42,9 @@ export default function DriverRoute() {
       {route.route.status === "out" && (
         <div className="actions">
           <ErrorBanner error={err} />
-          <button disabled={!done || busy} onClick={finish}>{done ? "Finish route" : "Finish route (stops remaining)"}</button>
+          <button disabled={!done || busy || unsynced > 0} onClick={finish}>
+            {!done ? "Finish route (stops remaining)" : unsynced > 0 ? `Finish route (waiting for ${unsynced} updates to sync)` : "Finish route"}
+          </button>
         </div>
       )}
     </>
