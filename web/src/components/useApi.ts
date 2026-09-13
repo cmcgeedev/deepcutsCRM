@@ -16,6 +16,11 @@ export function useApi<T>(fn: () => Promise<Result<T>>, deps: unknown[]) {
       const e = errorOf(r);
       setError(e);
       setData(e ? undefined : r.data);
+    }).catch(() => {
+      // openapi-fetch rejects (rather than resolving) on a network failure.
+      if (!alive) return;
+      setError({ code: "offline", message: "No connection" });
+      setData(undefined);
     }).finally(() => alive && setLoading(false));
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,21 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, errorOf, type ApiError } from "../api/client";
-import { clearRoute, loadRoute, saveRoute } from "./db";
+import { clearRoute, loadRouteMeta, saveRoute } from "./db";
 import { applyLocally, enqueue, flush, startAutoFlush, subscribe } from "./queue";
 import type { DriverAction, DriverRoute, QueueItem } from "./types";
 
-/** Browser-local YYYY-MM-DD, matching how routeDate is compared (not UTC). */
-function localToday(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
+const CACHE_TTL_MS = 20 * 60 * 60 * 1000;
 
-/** Cached route, but only if it's today's -- an older cached route is cleared and ignored. */
+/**
+ * Cached route, but only if it was saved recently. The server (not the browser)
+ * picks the route date in the business timezone, so comparing the cached
+ * route's routeDate against the browser-local date rejects perfectly good
+ * cache near midnight/DST boundaries; routeDate is only a tiebreak/debug aid
+ * now. A stale (>20h old) cache is cleared and ignored.
+ */
 async function loadFreshRoute(): Promise<DriverRoute | null> {
-  const cached = await loadRoute();
+  const cached = await loadRouteMeta();
   if (!cached) return null;
-  if (cached.route.routeDate !== localToday()) { await clearRoute(); return null; }
-  return cached;
+  if (Date.now() - cached.savedAt > CACHE_TTL_MS) { await clearRoute(); return null; }
+  return cached.route;
 }
 
 export function useRoute() {
@@ -58,7 +60,7 @@ export function useRoute() {
         if (!alive) return;
         const e = errorOf(r);
         if (r.data) { setServer(r.data); await saveRoute(r.data); setError(null); }
-        else if (e?.code === "not_found") { setServer(null); setError(null); }
+        else if (e?.code === "not_found") { setServer(null); setError(null); await clearRoute(); }
         else if (r.response.status === 401) { setError(e); }
         else if (!fresh) setError(e);
       } catch {
@@ -104,4 +106,11 @@ export function useRoute() {
   }, []);
 
   return { route, loading, error, reload, pending, stuck: queue.filter((q) => q.status === "stuck"), act, complete, online };
+}
+
+/** Count of not-yet-delivered driver actions, for gating things like sign-out from any driver screen. */
+export function useUnsyncedCount(): number {
+  const [count, setCount] = useState(0);
+  useEffect(() => subscribe((items) => setCount(items.filter((q) => q.status === "pending").length)), []);
+  return count;
 }

@@ -31,6 +31,10 @@ export function openDB() {
 
 export async function saveRoute(route: DriverRoute) { await (await openDB()).put("route", { route, savedAt: Date.now() }, "current"); }
 export async function loadRoute(): Promise<DriverRoute | null> { return (await (await openDB()).get("route", "current"))?.route ?? null; }
+/** Like loadRoute, but also returns when the cache was written so callers can judge freshness. */
+export async function loadRouteMeta(): Promise<{ route: DriverRoute; savedAt: number } | null> {
+  return (await (await openDB()).get("route", "current")) ?? null;
+}
 export async function clearRoute(): Promise<void> { await (await openDB()).delete("route", "current"); }
 export async function putQueue(item: QueueItem) { await (await openDB()).put("queue", item); }
 export async function listQueue(): Promise<QueueItem[]> { return (await openDB()).getAllFromIndex("queue", "byCreated"); }
