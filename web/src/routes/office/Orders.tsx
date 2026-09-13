@@ -14,7 +14,8 @@ export default function Orders() {
   const list = useApi(() => api.GET("/api/office/orders", { params: { query: { date: date || undefined, status: status || undefined } } }), [date, status]);
   const customers = useApi(() => api.GET("/api/office/customers"), []);
   const [customerId, setCustomerId] = useState(0);
-  const [newDate, setNewDate] = useState(new Date(Date.now() + 86400000).toISOString().slice(0, 10));
+  // Lazy initializer: Date.now() only runs once, for the initial state, not on every render.
+  const [newDate, setNewDate] = useState(() => new Date(Date.now() + 86400000).toISOString().slice(0, 10));
   const [err, setErr] = useState<ApiError | null>(null);
 
   async function create(e: FormEvent) {

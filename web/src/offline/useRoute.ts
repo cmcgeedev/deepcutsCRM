@@ -48,6 +48,9 @@ export function useRoute() {
 
   useEffect(() => {
     let alive = true;
+    // Resetting to true at the start of every fetch (tick bump = reload()) is the
+    // point of this effect, not state derived from props -- not a set-state-in-effect footgun.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     (async () => {
       const fresh = await loadFreshRoute();

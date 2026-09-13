@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router";
 import { api, errorOf, type ApiError, type Schemas } from "../../api/client";
 import { ErrorBanner, Field } from "../../components/Field";
@@ -9,8 +9,9 @@ const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 type Input = Schemas["CustomerInput"];
 
 export function CustomerForm({ initial, onSubmit, fields, busy }: { initial: Input; onSubmit: (v: Input) => void; fields?: Record<string, string>; busy: boolean }) {
+  // `initial` only ever changes when the CustomerDetail parent gives this component a
+  // new `key` (see its render below), so a plain useState seed -- no reset effect needed.
   const [v, setV] = useState<Input>(initial);
-  useEffect(() => setV(initial), [initial]);
   const set = (k: keyof Input) => (e: { target: { value: string } }) => setV({ ...v, [k]: e.target.value });
   const days = v.deliveryDays ?? [];
   return (
@@ -51,10 +52,10 @@ export default function CustomerDetail() {
   const [effectiveFrom, setEffectiveFrom] = useState(new Date().toISOString().slice(0, 10));
   const [perr, setPerr] = useState<ApiError | null>(null);
 
-  // Keyed on cust.data (not recomputed on every render) so CustomerForm's
-  // useEffect only resets in-progress edits when the loaded customer
-  // actually changes -- not when unrelated CustomerDetail state (e.g. the
-  // negotiated-price form fields) changes and re-renders this component.
+  // Memoized so CustomerForm (seeded from `initial` via useState, reset by the
+  // `key={id}` below on navigation to a different customer) doesn't get a
+  // new object identity -- and doesn't lose in-progress edits -- on every
+  // unrelated CustomerDetail re-render (e.g. the negotiated-price form fields).
   const c = cust.data;
   const initial = useMemo<Input | null>(
     () =>
@@ -89,7 +90,7 @@ export default function CustomerDetail() {
       <h1>{c.name}</h1>
       <ErrorBanner error={err && !err.fields ? err : null} />
       {saved && <p className="muted">Saved.</p>}
-      <CustomerForm initial={initial} onSubmit={save} fields={err?.fields} busy={busy} />
+      <CustomerForm key={id} initial={initial} onSubmit={save} fields={err?.fields} busy={busy} />
 
       <h2>Negotiated prices</h2>
       <form onSubmit={addPrice} className="row card">

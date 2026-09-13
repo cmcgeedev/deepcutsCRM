@@ -10,6 +10,9 @@ export function useApi<T>(fn: () => Promise<Result<T>>, deps: unknown[]) {
   const [tick, setTick] = useState(0);
   useEffect(() => {
     let alive = true;
+    // Resetting to true at the start of every fetch (deps change or reload()) is the
+    // point of this effect, not state derived from props -- not a set-state-in-effect footgun.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     fn().then((r) => {
       if (!alive) return;
