@@ -10,5 +10,10 @@ data/
 
 # build outputs
 bin/
-web/dist/
+web/dist/*
+!web/dist/.gitkeep
 web/node_modules/
+certs/
+
+# SDD scratch
+.superpowers/

@@ -1,6 +1,6 @@
 # Deep Cuts CRM: Phase 1 Design (Core + Delivery)
 
-Status: draft, pending review
+Status: implemented (phase 1), pending merge
 Date: 2026-09-10
 
 ## Purpose
@@ -67,8 +67,10 @@ Each phase is useful on its own and gets its own spec and plan.
 
 ## Data model
 
-All amounts are stored as integer cents. Weights are stored as integer hundredths of a
-pound. No floating point in money or weight columns.
+All amounts are stored as integer cents. Weights and quantities are stored as integer
+hundredths of their unit -- hundredths of a pound for weight, and hundredths of the sell
+unit for a line's ordered/delivered quantity (1.00 case == 100, 1.00 each == 100), not just
+for `lb`. No floating point in money, weight, or quantity columns.
 
 **Customer**
 - id, name, billing address, delivery address, contact name, phone, email
@@ -97,7 +99,7 @@ pound. No floating point in money or weight columns.
 
 **OrderLine**
 - id, order_id, product_id
-- ordered_qty (in sell unit, hundredths for lb; cases for catch-weight)
+- ordered_qty (integer hundredths of the sell unit, for every unit -- lb, case, or each)
 - unit_price_cents (frozen at creation), price_overridden (bool)
 - est_weight (hundredths of lb, nullable; catch-weight only, from ordered cases × approx
   case weight)
@@ -166,9 +168,9 @@ by hand; the line records `price_overridden`.
 5. **Finalized.** Office reviewed and finalized. Read-only afterward. Phase 2 hooks the
    QBO push here; phase 1 just records finalized_at.
 
-**Shipped weights** are entered per line from the office before the route goes out. If a
-catch-weight line has no shipped weight when the route is marked out, the app warns but
-does not block.
+**Shipped weights** are entered per line from the office before the route goes out. Phase 1
+does not warn when a catch-weight line lacks a shipped weight at route-out; the driver
+records delivered weight and finalize refuses missing weights. Warning deferred.
 
 **Shortages and rejections.** Driver reduces delivered weight or quantity and leaves a note.
 A fully rejected line has delivered quantity zero. Any difference between delivered and
@@ -223,6 +225,7 @@ deepcutsCRM/
   internal/
     config/                   env-driven settings, DEEPCUTS_* prefix
     db/                       sqlite open (modernc.org/sqlite), WAL pragma, embedded goose migrations
+    db/migrations/            goose migrations; sqlc reads this as its schema source
     db/queries/               sqlc-generated code
     domain/                   plain types and rules: pricing, order and route state machines,
                               driver action application; no database access
@@ -232,8 +235,7 @@ deepcutsCRM/
     storage/                  proof uploads to local dir now, S3 later
     importer/                 CSV and QBO customer/product/price imports
   sql/
-    schema/                   goose migrations
-    queries/                  sqlc query files
+    queries/                  sqlc query files (schema comes from internal/db/migrations)
   api/openapi.yaml            the API contract; Go and TS code are generated from it
   web/                        Vite + React (TypeScript)
     src/routes/office/        day view, orders, customers, products, prices
@@ -299,6 +301,8 @@ UI.
 3. `deepcuts seed demo` loads fixture data: one office user, two drivers, a dozen customers
    with delivery notes, forty products (half catch-weight), per-customer prices for a few
    customers, and a week of orders in mixed states including one route already out.
+   Yesterday's route is complete with three delivered orders: one finalized, one flagged
+   `needs_review` (a driver adjustment on delivery), and one plain delivered order.
 4. Start the server on localhost and print the office and driver logins.
 
 The demo uses the same binary and code paths as production. No mocks.

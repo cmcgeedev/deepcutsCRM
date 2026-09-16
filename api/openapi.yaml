@@ -1,0 +1,645 @@
+openapi: 3.0.3
+info:
+  title: Deep Cuts CRM API
+  version: "1.0"
+servers:
+  - url: /
+paths:
+  /api/office/login:
+    post:
+      operationId: officeLogin
+      tags: [auth]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/OfficeLogin" } } } }
+      responses:
+        "200": { description: logged in, content: { application/json: { schema: { $ref: "#/components/schemas/User" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/logout:
+    post:
+      operationId: officeLogout
+      tags: [auth]
+      responses:
+        "204": { description: logged out }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/me:
+    get:
+      operationId: officeMe
+      tags: [auth]
+      responses:
+        "200": { description: current user, content: { application/json: { schema: { $ref: "#/components/schemas/User" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/driver/drivers:
+    get:
+      operationId: listDriverLoginNames
+      tags: [auth]
+      responses:
+        "200": { description: active drivers, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Driver" } } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/driver/login:
+    post:
+      operationId: driverLogin
+      tags: [auth]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/DriverLogin" } } } }
+      responses:
+        "200": { description: logged in, content: { application/json: { schema: { $ref: "#/components/schemas/User" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/driver/logout:
+    post:
+      operationId: driverLogout
+      tags: [auth]
+      responses:
+        "204": { description: logged out }
+        default: { $ref: "#/components/responses/Error" }
+  /api/driver/me:
+    get:
+      operationId: driverMe
+      tags: [auth]
+      responses:
+        "200": { description: current user, content: { application/json: { schema: { $ref: "#/components/schemas/User" } } } }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/office/customers:
+    get:
+      operationId: listCustomers
+      tags: [catalog]
+      parameters:
+        - { name: includeInactive, in: query, schema: { type: boolean } }
+      responses:
+        "200": { description: customers, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Customer" } } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createCustomer
+      tags: [catalog]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/CustomerInput" } } } }
+      responses:
+        "201": { description: created, content: { application/json: { schema: { $ref: "#/components/schemas/Customer" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/customers/{customerId}:
+    parameters:
+      - { name: customerId, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      operationId: getCustomer
+      tags: [catalog]
+      responses:
+        "200": { description: customer, content: { application/json: { schema: { $ref: "#/components/schemas/Customer" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    put:
+      operationId: updateCustomer
+      tags: [catalog]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/CustomerInput" } } } }
+      responses:
+        "200": { description: updated, content: { application/json: { schema: { $ref: "#/components/schemas/Customer" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/customers/{customerId}/prices:
+    parameters:
+      - { name: customerId, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      operationId: listCustomerPrices
+      tags: [catalog]
+      parameters:
+        - { name: asOf, in: query, schema: { type: string }, description: "YYYY-MM-DD, defaults to today" }
+      responses:
+        "200": { description: current prices, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/CustomerPrice" } } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      operationId: setCustomerPrice
+      tags: [catalog]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/PriceInput" } } } }
+      responses:
+        "201": { description: created, content: { application/json: { schema: { $ref: "#/components/schemas/CustomerPrice" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/products:
+    get:
+      operationId: listProducts
+      tags: [catalog]
+      parameters:
+        - { name: includeInactive, in: query, schema: { type: boolean } }
+      responses:
+        "200": { description: products, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Product" } } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createProduct
+      tags: [catalog]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ProductInput" } } } }
+      responses:
+        "201": { description: created, content: { application/json: { schema: { $ref: "#/components/schemas/Product" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/products/{productId}:
+    parameters:
+      - { name: productId, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      operationId: getProduct
+      tags: [catalog]
+      responses:
+        "200": { description: product, content: { application/json: { schema: { $ref: "#/components/schemas/Product" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    put:
+      operationId: updateProduct
+      tags: [catalog]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ProductInput" } } } }
+      responses:
+        "200": { description: updated, content: { application/json: { schema: { $ref: "#/components/schemas/Product" } } } }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/office/orders:
+    get:
+      operationId: listOrders
+      tags: [orders]
+      parameters:
+        - { name: date, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string } }
+        - { name: customerId, in: query, schema: { type: integer, format: int64 } }
+      responses:
+        "200": { description: orders, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/OrderSummary" } } } } }
+        default: { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createOrder
+      tags: [orders]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/OrderInput" } } } }
+      responses:
+        "201": { description: created, content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/orders/{orderId}:
+    parameters:
+      - { name: orderId, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      operationId: getOrder
+      tags: [orders]
+      responses:
+        "200": { description: order, content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    patch:
+      operationId: updateOrder
+      tags: [orders]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/OrderPatch" } } } }
+      responses:
+        "200": { description: updated, content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/orders/{orderId}/lines:
+    parameters:
+      - { name: orderId, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      operationId: addOrderLine
+      tags: [orders]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/LineInput" } } } }
+      responses:
+        "200": { description: order with new line, content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/orders/{orderId}/lines/{lineId}:
+    parameters:
+      - { name: orderId, in: path, required: true, schema: { type: integer, format: int64 } }
+      - { name: lineId, in: path, required: true, schema: { type: integer, format: int64 } }
+    patch:
+      operationId: updateOrderLine
+      tags: [orders]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/LinePatch" } } } }
+      responses:
+        "200": { description: order, content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } }
+        default: { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: deleteOrderLine
+      tags: [orders]
+      responses:
+        "200": { description: order, content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/orders/{orderId}/confirm:
+    post:
+      operationId: confirmOrder
+      tags: [orders]
+      parameters: [ { name: orderId, in: path, required: true, schema: { type: integer, format: int64 } } ]
+      responses:
+        "200": { description: order, content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/orders/{orderId}/unconfirm:
+    post:
+      operationId: unconfirmOrder
+      tags: [orders]
+      parameters: [ { name: orderId, in: path, required: true, schema: { type: integer, format: int64 } } ]
+      responses:
+        "200": { description: order, content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/orders/{orderId}/cancel:
+    post:
+      operationId: cancelOrder
+      tags: [orders]
+      parameters: [ { name: orderId, in: path, required: true, schema: { type: integer, format: int64 } } ]
+      responses:
+        "200": { description: order, content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/orders/{orderId}/finalize:
+    post:
+      operationId: finalizeOrder
+      tags: [orders]
+      parameters: [ { name: orderId, in: path, required: true, schema: { type: integer, format: int64 } } ]
+      responses:
+        "200": { description: order, content: { application/json: { schema: { $ref: "#/components/schemas/Order" } } } }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/office/day:
+    get:
+      operationId: getDay
+      tags: [routes]
+      parameters:
+        - { name: date, in: query, required: true, schema: { type: string } }
+      responses:
+        "200": { description: day view, content: { application/json: { schema: { $ref: "#/components/schemas/DayView" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/drivers:
+    get:
+      operationId: listDrivers
+      tags: [routes]
+      responses:
+        "200": { description: drivers, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Driver" } } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/routes:
+    post:
+      operationId: createRoute
+      tags: [routes]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RouteInput" } } } }
+      responses:
+        "201": { description: created, content: { application/json: { schema: { $ref: "#/components/schemas/Route" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/routes/{routeId}:
+    parameters:
+      - { name: routeId, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      operationId: getRoute
+      tags: [routes]
+      responses:
+        "200": { description: route, content: { application/json: { schema: { $ref: "#/components/schemas/Route" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/routes/{routeId}/stops:
+    parameters:
+      - { name: routeId, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      operationId: addStop
+      tags: [routes]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/AddStopInput" } } } }
+      responses:
+        "200": { description: route, content: { application/json: { schema: { $ref: "#/components/schemas/Route" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/routes/{routeId}/stops/{stopId}:
+    parameters:
+      - { name: routeId, in: path, required: true, schema: { type: integer, format: int64 } }
+      - { name: stopId, in: path, required: true, schema: { type: integer, format: int64 } }
+    delete:
+      operationId: removeStop
+      tags: [routes]
+      responses:
+        "200": { description: route, content: { application/json: { schema: { $ref: "#/components/schemas/Route" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/routes/{routeId}/sequence:
+    put:
+      operationId: reorderStops
+      tags: [routes]
+      parameters: [ { name: routeId, in: path, required: true, schema: { type: integer, format: int64 } } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/SequenceInput" } } } }
+      responses:
+        "200": { description: route, content: { application/json: { schema: { $ref: "#/components/schemas/Route" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/routes/{routeId}/out:
+    post:
+      operationId: routeOut
+      tags: [routes]
+      parameters: [ { name: routeId, in: path, required: true, schema: { type: integer, format: int64 } } ]
+      responses:
+        "200": { description: route, content: { application/json: { schema: { $ref: "#/components/schemas/Route" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/routes/{routeId}/complete:
+    post:
+      operationId: routeComplete
+      tags: [routes]
+      parameters: [ { name: routeId, in: path, required: true, schema: { type: integer, format: int64 } } ]
+      responses:
+        "200": { description: route, content: { application/json: { schema: { $ref: "#/components/schemas/Route" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/office/stops/{stopId}/proof:
+    get:
+      operationId: getStopProof
+      tags: [routes]
+      parameters: [ { name: stopId, in: path, required: true, schema: { type: integer, format: int64 } } ]
+      responses:
+        "200": { description: proof image, content: { image/png: { schema: { type: string, format: binary } }, image/jpeg: { schema: { type: string, format: binary } } } }
+        default: { $ref: "#/components/responses/Error" }
+
+  /api/driver/route:
+    get:
+      operationId: getDriverRoute
+      tags: [driver]
+      parameters:
+        - { name: date, in: query, schema: { type: string }, description: "YYYY-MM-DD, defaults to today" }
+      responses:
+        "200": { description: today's route, content: { application/json: { schema: { $ref: "#/components/schemas/DriverRoute" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/driver/stops/{stopId}/actions:
+    post:
+      operationId: postDriverAction
+      tags: [driver]
+      parameters: [ { name: stopId, in: path, required: true, schema: { type: integer, format: int64 } } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/DriverAction" } } } }
+      responses:
+        "200": { description: result, content: { application/json: { schema: { $ref: "#/components/schemas/DriverActionResult" } } } }
+        default: { $ref: "#/components/responses/Error" }
+  /api/driver/routes/{routeId}/complete:
+    post:
+      operationId: driverCompleteRoute
+      tags: [driver]
+      parameters: [ { name: routeId, in: path, required: true, schema: { type: integer, format: int64 } } ]
+      responses:
+        "200": { description: route, content: { application/json: { schema: { $ref: "#/components/schemas/DriverRoute" } } } }
+        default: { $ref: "#/components/responses/Error" }
+
+components:
+  responses:
+    Error:
+      description: error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        fields: { type: object, additionalProperties: { type: string } }
+    User:
+      type: object
+      required: [id, realm, displayName]
+      properties:
+        id: { type: integer, format: int64 }
+        realm: { type: string, enum: [office, driver, customer] }
+        displayName: { type: string }
+    Driver:
+      type: object
+      required: [id, displayName]
+      properties:
+        id: { type: integer, format: int64 }
+        displayName: { type: string }
+    OfficeLogin:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string }
+    DriverLogin:
+      type: object
+      required: [userId, pin]
+      properties:
+        userId: { type: integer, format: int64 }
+        pin: { type: string }
+    Customer:
+      type: object
+      required: [id, name, billingAddress, deliveryAddress, contactName, phone, email, deliveryNotes, deliveryDays, active]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        billingAddress: { type: string }
+        deliveryAddress: { type: string }
+        contactName: { type: string }
+        phone: { type: string }
+        email: { type: string }
+        deliveryNotes: { type: string }
+        deliveryDays: { type: array, items: { type: string } }
+        qboCustomerId: { type: string }
+        active: { type: boolean }
+    CustomerInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        billingAddress: { type: string }
+        deliveryAddress: { type: string }
+        contactName: { type: string }
+        phone: { type: string }
+        email: { type: string }
+        deliveryNotes: { type: string }
+        deliveryDays: { type: array, items: { type: string } }
+        qboCustomerId: { type: string }
+        active: { type: boolean, default: true }
+    Product:
+      type: object
+      required: [id, sku, name, category, sellUnit, catchWeight, basePriceCents, active]
+      properties:
+        id: { type: integer, format: int64 }
+        sku: { type: string }
+        name: { type: string }
+        category: { type: string }
+        sellUnit: { type: string, enum: [lb, case, each] }
+        catchWeight: { type: boolean }
+        approxCaseWeight: { type: integer, format: int64, description: hundredths of a pound }
+        basePriceCents: { type: integer, format: int64 }
+        qboItemId: { type: string }
+        active: { type: boolean }
+    ProductInput:
+      type: object
+      required: [sku, name, sellUnit, basePriceCents]
+      properties:
+        sku: { type: string }
+        name: { type: string }
+        category: { type: string }
+        sellUnit: { type: string, enum: [lb, case, each] }
+        catchWeight: { type: boolean, default: false }
+        approxCaseWeight: { type: integer, format: int64 }
+        basePriceCents: { type: integer, format: int64 }
+        qboItemId: { type: string }
+        active: { type: boolean, default: true }
+    CustomerPrice:
+      type: object
+      required: [id, productId, sku, productName, priceCents, effectiveFrom]
+      properties:
+        id: { type: integer, format: int64 }
+        productId: { type: integer, format: int64 }
+        sku: { type: string }
+        productName: { type: string }
+        priceCents: { type: integer, format: int64 }
+        effectiveFrom: { type: string }
+    PriceInput:
+      type: object
+      required: [productId, priceCents, effectiveFrom]
+      properties:
+        productId: { type: integer, format: int64 }
+        priceCents: { type: integer, format: int64 }
+        effectiveFrom: { type: string }
+    OrderSummary:
+      type: object
+      required: [id, customerId, customerName, requestedDeliveryDate, status, needsReview, lineCount, notes]
+      properties:
+        id: { type: integer, format: int64 }
+        customerId: { type: integer, format: int64 }
+        customerName: { type: string }
+        requestedDeliveryDate: { type: string }
+        status: { $ref: "#/components/schemas/OrderStatus" }
+        needsReview: { type: boolean }
+        lineCount: { type: integer, format: int64 }
+        notes: { type: string }
+    OrderStatus:
+      type: string
+      enum: [draft, confirmed, scheduled, delivered, finalized, cancelled]
+    OrderInput:
+      type: object
+      required: [customerId, requestedDeliveryDate]
+      properties:
+        customerId: { type: integer, format: int64 }
+        requestedDeliveryDate: { type: string }
+        notes: { type: string }
+    OrderPatch:
+      type: object
+      properties:
+        notes: { type: string }
+        requestedDeliveryDate: { type: string }
+    OrderLine:
+      type: object
+      required: [id, productId, sku, productName, sellUnit, catchWeight, orderedQty, unitPriceCents, priceOverridden, shortageNote, amountCents, amountSource]
+      properties:
+        id: { type: integer, format: int64 }
+        productId: { type: integer, format: int64 }
+        sku: { type: string }
+        productName: { type: string }
+        sellUnit: { type: string }
+        catchWeight: { type: boolean }
+        orderedQty: { type: integer, format: int64, description: hundredths of the sell unit }
+        unitPriceCents: { type: integer, format: int64 }
+        priceOverridden: { type: boolean }
+        estWeight: { type: integer, format: int64 }
+        shippedWeight: { type: integer, format: int64 }
+        deliveredQty: { type: integer, format: int64 }
+        deliveredWeight: { type: integer, format: int64 }
+        shortageNote: { type: string }
+        amountCents: { type: integer, format: int64 }
+        amountSource: { type: string, enum: [delivered, shipped, estimated, ordered] }
+    LineInput:
+      type: object
+      required: [productId, orderedQty]
+      properties:
+        productId: { type: integer, format: int64 }
+        orderedQty: { type: integer, format: int64 }
+    LinePatch:
+      type: object
+      properties:
+        orderedQty: { type: integer, format: int64 }
+        unitPriceCents: { type: integer, format: int64 }
+        shippedWeight: { type: integer, format: int64 }
+        deliveredQty: { type: integer, format: int64 }
+        deliveredWeight: { type: integer, format: int64 }
+        shortageNote: { type: string }
+    Order:
+      type: object
+      required: [id, customer, requestedDeliveryDate, status, notes, needsReview, lines, totalCents, createdAt]
+      properties:
+        id: { type: integer, format: int64 }
+        customer: { $ref: "#/components/schemas/Customer" }
+        requestedDeliveryDate: { type: string }
+        status: { $ref: "#/components/schemas/OrderStatus" }
+        notes: { type: string }
+        needsReview: { type: boolean }
+        lines: { type: array, items: { $ref: "#/components/schemas/OrderLine" } }
+        totalCents: { type: integer, format: int64 }
+        routeId: { type: integer, format: int64 }
+        stopId: { type: integer, format: int64 }
+        routeStatus: { type: string }
+        createdAt: { type: string, format: date-time }
+        finalizedAt: { type: string, format: date-time }
+    RouteInput:
+      type: object
+      required: [routeDate, driverUserId]
+      properties:
+        routeDate: { type: string }
+        driverUserId: { type: integer, format: int64 }
+        truckLabel: { type: string }
+    Stop:
+      type: object
+      required: [id, routeId, orderId, sequence, status, hasProofImage, skipReason, driverNote, customerName, deliveryAddress, phone, contactName, deliveryNotes, orderStatus, needsReview, lineCount]
+      properties:
+        id: { type: integer, format: int64 }
+        routeId: { type: integer, format: int64 }
+        orderId: { type: integer, format: int64 }
+        sequence: { type: integer, format: int64 }
+        status: { type: string, enum: [pending, delivered, skipped] }
+        deliveredAt: { type: string, format: date-time }
+        proofType: { type: string, enum: [signature, photo, name] }
+        proofName: { type: string, description: received-by name when proofType is name }
+        hasProofImage: { type: boolean }
+        skipReason: { type: string }
+        driverNote: { type: string }
+        customerName: { type: string }
+        deliveryAddress: { type: string }
+        phone: { type: string }
+        contactName: { type: string }
+        deliveryNotes: { type: string }
+        orderStatus: { $ref: "#/components/schemas/OrderStatus" }
+        needsReview: { type: boolean }
+        lineCount: { type: integer, format: int64 }
+    Route:
+      type: object
+      required: [id, routeDate, driverUserId, driverName, truckLabel, status, stops]
+      properties:
+        id: { type: integer, format: int64 }
+        routeDate: { type: string }
+        driverUserId: { type: integer, format: int64 }
+        driverName: { type: string }
+        truckLabel: { type: string }
+        status: { type: string, enum: [planned, out, complete] }
+        outAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time }
+        stops: { type: array, items: { $ref: "#/components/schemas/Stop" } }
+    AddStopInput:
+      type: object
+      required: [orderId]
+      properties:
+        orderId: { type: integer, format: int64 }
+    SequenceInput:
+      type: object
+      required: [stopIds]
+      properties:
+        stopIds: { type: array, items: { type: integer, format: int64 } }
+    DayView:
+      type: object
+      required: [date, unscheduled, routes]
+      properties:
+        date: { type: string }
+        unscheduled: { type: array, items: { $ref: "#/components/schemas/OrderSummary" } }
+        routes: { type: array, items: { $ref: "#/components/schemas/Route" } }
+    DriverStop:
+      type: object
+      required: [stop, order]
+      properties:
+        stop: { $ref: "#/components/schemas/Stop" }
+        order: { $ref: "#/components/schemas/Order" }
+    DriverRoute:
+      type: object
+      required: [route, stops]
+      properties:
+        route: { $ref: "#/components/schemas/Route" }
+        stops: { type: array, items: { $ref: "#/components/schemas/DriverStop" } }
+    Proof:
+      type: object
+      required: [type]
+      properties:
+        type: { type: string, enum: [signature, photo, name] }
+        dataBase64: { type: string, description: PNG or JPEG bytes, base64, at most 300 KB decoded }
+        name: { type: string }
+    LineAdjustment:
+      type: object
+      required: [lineId]
+      properties:
+        lineId: { type: integer, format: int64 }
+        deliveredQty: { type: integer, format: int64 }
+        deliveredWeight: { type: integer, format: int64 }
+        shortageNote: { type: string }
+    DriverAction:
+      type: object
+      required: [clientId, type]
+      properties:
+        clientId: { type: string, description: client-generated UUID; replays are acknowledged and not reapplied }
+        type: { type: string, enum: [deliver, adjust, skip] }
+        proof: { $ref: "#/components/schemas/Proof" }
+        lines: { type: array, items: { $ref: "#/components/schemas/LineAdjustment" } }
+        note: { type: string }
+        skipReason: { type: string }
+    DriverActionResult:
+      type: object
+      required: [applied, stop]
+      properties:
+        applied: { type: boolean }
+        stop: { $ref: "#/components/schemas/DriverStop" }
